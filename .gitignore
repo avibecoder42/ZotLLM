@@ -1,0 +1,18 @@
+.venv/
+dist/
+build/
+__pycache__/
+*.egg-info/
+*.pyc
+.pytest_cache/
+*.log
+
+# Lokal, nicht Teil des Projekts: Einstellungen von Claude Code, Bildschirmfotos, Konzeptpapier, Rechner-Diagnosen
+.claude/
+bugs/
+Chat.docx
+KSM_SMARTLOG/
+ssd-smart.txt
+
+# Interne Entwicklungsgeschichte (0.4.1–0.8.0), nicht veröffentlicht
+Changelog-Entwicklung.md

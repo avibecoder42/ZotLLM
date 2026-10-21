@@ -1,0 +1,12 @@
+{
+ "about": "Eingebaute Embedding-Laufzeit: offizielles Windows-Paket von llama.cpp (alle Prozessor-Varianten, Auswahl zur Laufzeit). Version und Prüfsumme fest; neue Version = hier eintragen und neu bauen.",
+ "build": "b11609",
+ "windows-x64": {
+  "asset": "llama-b11609-bin-win-cpu-x64.zip",
+  "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11609/llama-b11609-bin-win-cpu-x64.zip",
+  "sha256": "8708a7b81842333927f6377ac3f17ff8bba4dbe1ee0cf28dfd5e7a32e3a46b38"
+ },
+ "license_url": "https://raw.githubusercontent.com/ggml-org/llama.cpp/b11609/LICENSE",
+ "files": ["llama-server.exe", "llama-server-impl.dll", "llama-common.dll", "llama.dll", "ggml.dll", "ggml-base.dll",
+           "ggml-cpu-*.dll", "libomp.dll", "mtmd.dll", "LICENSE-LLVM-OpenMP"]
+}

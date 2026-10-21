@@ -1,0 +1,4 @@
+# Shell-Skripte immer mit LF, Windows-Skripte mit CRLF (wichtig für die Portierung auf Mac/Linux)
+*.sh text eol=lf
+*.command text eol=lf
+*.bat text eol=crlf

@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zotllm"
+version = "0.8.1"
+description = "Semantic search, cited answers and literature reviews for your own Zotero library – local service with selectable embedding models and LLMs."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Claude (Anthropic) – vibe-coded" }]
+maintainers = [{ name = "avibecoder" }]
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "httpx>=0.27",
+    "keyring>=25",
+    "platformdirs>=4",
+    "numpy>=1.26",
+    "pymupdf>=1.24",
+    "openai>=1.40",
+    "anthropic>=1.0",
+    "google-genai>=1.0",
+]
+
+[project.optional-dependencies]
+# MCP-Server für Claude Desktop & Co.
+mcp = ["mcp>=1.2"]
+# Lokale Modelle ohne Ollama (z. B. EmbeddingGemma 2 von Hugging Face, bge-reranker)
+local = ["sentence-transformers>=3.0"]
+# Programmfenster (Windows: WebView2 über pythonnet; macOS: WebKit; Linux: GTK oder Qt)
+desktop = ["pywebview>=6.2"]
+# Windows-Installer bauen (packaging/build.ps1)
+build = ["pyinstaller>=6.20", "pywebview>=6.2"]
+dev = ["pytest>=8"]
+
+[project.urls]
+Homepage = "https://github.com/avibecoder42/ZotLLM"
+Changelog = "https://github.com/avibecoder42/ZotLLM/blob/main/CHANGELOG.md"
+
+[project.scripts]
+zotllm = "zotllm.cli:main"
+
+[project.gui-scripts]
+# Startet den Dienst ohne Konsolenfenster (Windows: pythonw)
+zotllm-service = "zotllm.cli:service_main"
+# Programmfenster mit eingebettetem Dienst
+zotllm-app = "zotllm.desktop:entry"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zotllm"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

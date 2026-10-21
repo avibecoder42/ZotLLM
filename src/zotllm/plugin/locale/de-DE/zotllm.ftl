@@ -1,0 +1,16 @@
+zotllm-menu =
+    .label = ZotLLM
+zotllm-index-collection =
+    .label = Sammlung indexieren
+zotllm-ask-collection =
+    .label = Fragen zu dieser Sammlung …
+zotllm-ask-items =
+    .label = Fragen zu ausgewählten Einträgen …
+zotllm-index-items =
+    .label = Ausgewählte Einträge indexieren
+zotllm-sheets-items =
+    .label = Auswertungsblätter erstellen
+zotllm-open =
+    .label = ZotLLM öffnen
+zotllm-sync =
+    .label = ZotLLM: jetzt abgleichen
