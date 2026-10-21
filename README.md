@@ -15,6 +15,11 @@
 
 <p align="center"><b>English</b> · <a href="README.de.md">Deutsch</a></p>
 
+ZotLLM is a desktop application that works alongside Zotero. You organise your work in **projects**, each with its own
+**knowledge corpora**: a corpus is a selection of Zotero collections or whole libraries, group libraries included.
+ZotLLM reads the PDFs and other texts of the corpora, keeps their printed page numbers and indexes them on your
+computer. Questions and literature reviews then draw on exactly the texts that belong to the project.
+
 <table>
   <tr>
     <td width="33%" valign="top"><img src="docs/img/feature-ask.svg" width="40" height="40" alt=""><br><b>Ask</b><br>Questions about your own texts, answered only from the retrieved passages. Every citation opens the passage and its page.</td>
@@ -22,11 +27,6 @@
     <td width="33%" valign="top"><img src="docs/img/feature-search.svg" width="40" height="40" alt=""><br><b>Search</b><br>Fast search across your library and groups, without a language model. Copy references in your citation style or export a selection.</td>
   </tr>
 </table>
-
-ZotLLM is a desktop application that works alongside Zotero. You organise your work in **projects**, each with its own
-**knowledge corpora**: a corpus is a selection of Zotero collections or whole libraries, group libraries included.
-ZotLLM reads the PDFs and other texts of the corpora, keeps their printed page numbers and indexes them on your
-computer. Questions and literature reviews then draw on exactly the texts that belong to the project.
 
 Language models are your choice: **Claude, ChatGPT (OpenAI), Gemini, DeepSeek** via API, or local models via
 **Ollama**. Embedding models also run **built in** (llama.cpp), entirely on your computer, with a curated model catalog.

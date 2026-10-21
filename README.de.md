@@ -15,6 +15,11 @@
 
 <p align="center"><a href="README.md">English</a> · <b>Deutsch</b></p>
 
+ZotLLM ist ein Programm für den Desktop, das mit Zotero zusammenarbeitet. Die Arbeit ist in **Projekte** gegliedert,
+jedes mit eigenen **Wissenskorpora**: Ein Korpus ist eine Auswahl von Zotero-Sammlungen oder ganzen Bibliotheken, auch
+aus Gruppen. ZotLLM liest die PDFs und weiteren Texte der Korpora samt gedruckten Seitenzahlen und indexiert sie auf dem
+eigenen Rechner. Fragen und Forschungsstände stützen sich dann genau auf die Texte des Projekts.
+
 <table>
   <tr>
     <td width="33%" valign="top"><img src="docs/img/feature-ask.svg" width="40" height="40" alt=""><br><b>Fragen</b><br>Fragen an die eigenen Texte, beantwortet nur aus den gefundenen Textstellen. Jeder Beleg öffnet die Textstelle mit Seite.</td>
@@ -22,11 +27,6 @@
     <td width="33%" valign="top"><img src="docs/img/feature-search.svg" width="40" height="40" alt=""><br><b>Suchen</b><br>Schnelle Suche über die eigene Bibliothek und alle Gruppen, ohne Sprachmodell. Literaturangaben im eigenen Zitierstil kopieren oder eine Auswahl exportieren.</td>
   </tr>
 </table>
-
-ZotLLM ist ein Programm für den Desktop, das mit Zotero zusammenarbeitet. Die Arbeit ist in **Projekte** gegliedert,
-jedes mit eigenen **Wissenskorpora**: Ein Korpus ist eine Auswahl von Zotero-Sammlungen oder ganzen Bibliotheken, auch
-aus Gruppen. ZotLLM liest die PDFs und weiteren Texte der Korpora samt gedruckten Seitenzahlen und indexiert sie auf dem
-eigenen Rechner. Fragen und Forschungsstände stützen sich dann genau auf die Texte des Projekts.
 
 Die Sprachmodelle sind frei wählbar: **Claude, ChatGPT (OpenAI), Gemini, DeepSeek** per API oder lokale Modelle über
 **Ollama**. Embedding-Modelle laufen zudem **eingebaut** (llama.cpp), ganz auf dem eigenen Rechner, mit einem geprüften
