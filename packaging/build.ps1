@@ -22,7 +22,8 @@ if (-not (Test-Path $py)) {
 # Abhängigkeiten für den Build nur nachinstallieren, wenn sie fehlen (kein Netzzugriff bei vollständiger Umgebung)
 & $py -c "import PyInstaller, webview, pytest" 2>$null
 if ($LASTEXITCODE -ne 0) {
-    & $py -m pip install -e "$root[dev,build,mcp]"
+    # Mit den getesteten Versionen (constraints.txt): neuere Pakete brauchen u. U. Anpassungen am PyInstaller-Paket
+    & $py -m pip install -c (Join-Path $PSScriptRoot "constraints.txt") -e "$root[dev,build,mcp]"
     if ($LASTEXITCODE -ne 0) { throw "Installation der Abhängigkeiten fehlgeschlagen" }
 }
 New-Item -ItemType Directory -Force (Join-Path $root "build") | Out-Null
