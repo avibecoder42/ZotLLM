@@ -1,13 +1,44 @@
-# ZotLLM
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/banner-en-dark.png">
+    <img src="docs/img/banner-en-light.png" alt="ZotLLM – Ask your Zotero library. Semantic search, answers and literature reviews with citations down to the page.">
+  </picture>
+</p>
 
-**English** · [Deutsch](README.de.md)
+<p align="center">
+  <a href="https://github.com/avibecoder42/ZotLLM/releases/latest"><img src="https://img.shields.io/github/v/release/avibecoder42/ZotLLM?label=release&color=4a43c4" alt="Latest release"></a>
+  <a href="https://github.com/avibecoder42/ZotLLM/releases"><img src="https://img.shields.io/github/downloads/avibecoder42/ZotLLM/total?color=4a43c4" alt="Downloads"></a>
+  <img src="https://img.shields.io/badge/platform-Windows-4a43c4" alt="Platform: Windows">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/avibecoder42/ZotLLM?color=4a43c4" alt="License: MIT"></a>
+  <a href="#vibe-coded"><img src="https://img.shields.io/badge/vibe--coded%20with-Claude-d97757" alt="Vibe-coded with Claude"></a>
+</p>
 
-Semantic search, questions answered with citations, and a multi-step **literature review mode** for your own Zotero
-library. Embedding models and large language models are freely selectable: **Claude, ChatGPT (OpenAI), Gemini,
-DeepSeek** via API, and local models via **Ollama**. Embedding models also run **built in** (llama.cpp) – no extra
-installation, with a curated model catalog. API keys are stored encrypted in the operating system's key store.
+<p align="center"><b>English</b> · <a href="README.de.md">Deutsch</a></p>
 
-Runs on Windows; paths, key storage and start scripts are prepared for macOS and Linux.
+<table>
+  <tr>
+    <td width="33%" valign="top"><img src="docs/img/feature-ask.svg" width="40" height="40" alt=""><br><b>Ask</b><br>Questions about your own texts, answered only from the retrieved passages. Every citation opens the passage and its page.</td>
+    <td width="33%" valign="top"><img src="docs/img/feature-review.svg" width="40" height="40" alt=""><br><b>Literature review</b><br>From search strategy to a checked synthesis: every citation and verbatim quotation is verified against the PDFs.</td>
+    <td width="33%" valign="top"><img src="docs/img/feature-search.svg" width="40" height="40" alt=""><br><b>Search</b><br>Fast search across your library and groups, without a language model. Copy references in your citation style or export a selection.</td>
+  </tr>
+</table>
+
+Language models are your choice: **Claude, ChatGPT (OpenAI), Gemini, DeepSeek** via API, or local models via
+**Ollama**. Embedding models also run **built in** (llama.cpp), entirely on your computer, with a curated model catalog.
+API keys are stored encrypted in the operating system's key store. Runs on Windows; paths, key storage and start
+scripts are prepared for macOS and Linux.
+
+<p align="center"><img src="docs/screenshots/en/ask.png" alt="Ask: answer with numbered citations and the cited passage"></p>
+<p align="center"><sub>Answers with citations; a click shows the passage and its page. Demo library with fictitious sources.</sub></p>
+
+<table>
+  <tr>
+    <td width="50%" valign="top"><img src="docs/screenshots/en/review.png" alt="Literature review: check step with statistics and the cited text"><br><sub>Literature review: every citation and quotation checked against the sources</sub></td>
+    <td width="50%" valign="top"><img src="docs/screenshots/en/search.png" alt="Search: results with three selected items and the selection bar"><br><sub>Search without a language model, with a selection to copy, export or ask about</sub></td>
+  </tr>
+</table>
+
+<a name="vibe-coded"></a>
 
 > **Vibe-coded.** ZotLLM was written by **Claude** (Anthropic's AI model, working in Claude Code) – the
 > application, the Zotero plugin, the installer scripts, the tests and the documentation. The project's initiator,
@@ -20,23 +51,6 @@ Runs on Windows; paths, key storage and start scripts are prepared for macOS and
 
 ZotLLM is an independent project, not affiliated with or endorsed by Zotero or the Corporation for Digital Scholarship.
 Zotero is a registered trademark of the Corporation for Digital Scholarship.
-
-## Screenshots
-
-*Demo library with fictitious sources.*
-
-**Ask** – answers with citations; a click on a citation shows the passage and its page, "Open PDF" jumps there.
-
-![Ask: answer with numbered citations and the cited passage](docs/screenshots/en/ask.png)
-
-**Literature review** – step 4: every citation and every verbatim quotation is checked against the sources.
-
-![Literature review: check step with statistics and the cited text](docs/screenshots/en/review.png)
-
-**Search without a language model** – across all libraries; selected items can be copied as references, exported or
-asked about.
-
-![Search: results with three selected items and the selection bar](docs/screenshots/en/search.png)
 
 ---
 

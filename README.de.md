@@ -1,14 +1,44 @@
-# ZotLLM
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/banner-de-dark.png">
+    <img src="docs/img/banner-de-light.png" alt="ZotLLM – Fragen an die eigene Zotero-Bibliothek. Semantische Suche, Antworten und Forschungsstand mit Belegen bis auf die Seite.">
+  </picture>
+</p>
 
-[English](README.md) · **Deutsch**
+<p align="center">
+  <a href="https://github.com/avibecoder42/ZotLLM/releases/latest"><img src="https://img.shields.io/github/v/release/avibecoder42/ZotLLM?label=release&color=4a43c4" alt="Neueste Version"></a>
+  <a href="https://github.com/avibecoder42/ZotLLM/releases"><img src="https://img.shields.io/github/downloads/avibecoder42/ZotLLM/total?color=4a43c4" alt="Downloads"></a>
+  <img src="https://img.shields.io/badge/platform-Windows-4a43c4" alt="Plattform: Windows">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/avibecoder42/ZotLLM?color=4a43c4" alt="Lizenz: MIT"></a>
+  <a href="#vibe-coded"><img src="https://img.shields.io/badge/vibe--coded%20with-Claude-d97757" alt="Vibe-coded mit Claude"></a>
+</p>
 
-Semantische Suche, Fragen mit Belegen und ein mehrstufiger **Forschungsstand-Modus** für die eigene
-Zotero-Bibliothek. Embedding-Modelle und grosse Sprachmodelle sind frei wählbar:
-**Claude, ChatGPT (OpenAI), Gemini, DeepSeek** per API sowie lokale Modelle über **Ollama**. Embedding-Modelle laufen
-zudem **eingebaut** (llama.cpp) – ohne zusätzliche Installation, mit einem geprüften Modellkatalog.
-API-Schlüssel liegen verschlüsselt im Schlüsselspeicher des Betriebssystems.
+<p align="center"><a href="README.md">English</a> · <b>Deutsch</b></p>
 
-Läuft unter Windows; Pfade, Schlüsselspeicher und Startskripte sind von Anfang an für macOS und Linux angelegt.
+<table>
+  <tr>
+    <td width="33%" valign="top"><img src="docs/img/feature-ask.svg" width="40" height="40" alt=""><br><b>Fragen</b><br>Fragen an die eigenen Texte, beantwortet nur aus den gefundenen Textstellen. Jeder Beleg öffnet die Textstelle mit Seite.</td>
+    <td width="33%" valign="top"><img src="docs/img/feature-review.svg" width="40" height="40" alt=""><br><b>Forschungsstand</b><br>Von der Suchstrategie bis zur geprüften Synthese: Jeder Beleg und jedes wörtliche Zitat wird an den PDFs geprüft.</td>
+    <td width="33%" valign="top"><img src="docs/img/feature-search.svg" width="40" height="40" alt=""><br><b>Suchen</b><br>Schnelle Suche über die eigene Bibliothek und alle Gruppen, ohne Sprachmodell. Literaturangaben im eigenen Zitierstil kopieren oder eine Auswahl exportieren.</td>
+  </tr>
+</table>
+
+Die Sprachmodelle sind frei wählbar: **Claude, ChatGPT (OpenAI), Gemini, DeepSeek** per API oder lokale Modelle über
+**Ollama**. Embedding-Modelle laufen zudem **eingebaut** (llama.cpp), ganz auf dem eigenen Rechner, mit einem geprüften
+Modellkatalog. API-Schlüssel liegen verschlüsselt im Schlüsselspeicher des Betriebssystems. Läuft unter Windows; Pfade,
+Schlüsselspeicher und Startskripte sind für macOS und Linux angelegt.
+
+<p align="center"><img src="docs/screenshots/de/ask.png" alt="Fragen: Antwort mit nummerierten Belegen und der zitierten Textstelle"></p>
+<p align="center"><sub>Antworten mit Belegen; ein Klick zeigt die Textstelle mit Seite. Demo-Bibliothek mit erfundenen Quellen.</sub></p>
+
+<table>
+  <tr>
+    <td width="50%" valign="top"><img src="docs/screenshots/de/review.png" alt="Forschungsstand: Prüfschritt mit Kennzahlen und dem belegten Text"><br><sub>Forschungsstand: Jeder Beleg und jedes Zitat wird an den Quellen geprüft</sub></td>
+    <td width="50%" valign="top"><img src="docs/screenshots/de/search.png" alt="Suchen: Treffer mit drei ausgewählten Einträgen und der Auswahlleiste"><br><sub>Suchen ohne Sprachmodell, mit Auswahl zum Kopieren, Exportieren oder Befragen</sub></td>
+  </tr>
+</table>
+
+<a name="vibe-coded"></a>
 
 > **Vibe-coded.** ZotLLM wurde von **Claude** geschrieben (dem KI-Modell von Anthropic, in Claude Code) – das
 > Programm, das Zotero-Plugin, die Installationsskripte, die Tests und die Dokumentation. Initiiert hat das Projekt
@@ -22,24 +52,6 @@ Läuft unter Windows; Pfade, Schlüsselspeicher und Startskripte sind von Anfang
 
 ZotLLM ist ein unabhängiges Projekt und steht in keiner Verbindung zu Zotero oder der Corporation for Digital
 Scholarship. Zotero ist eine eingetragene Marke der Corporation for Digital Scholarship.
-
-## Screenshots
-
-*Demo-Bibliothek mit erfundenen Quellen.*
-
-**Fragen** – Antworten mit Belegen; ein Klick auf einen Beleg zeigt die Textstelle mit Seite, «PDF öffnen» springt
-dorthin.
-
-![Fragen: Antwort mit nummerierten Belegen und der zitierten Textstelle](docs/screenshots/de/ask.png)
-
-**Forschungsstand** – Schritt 4: Jeder Beleg und jedes wörtliche Zitat wird an den Quellen geprüft.
-
-![Forschungsstand: Prüfschritt mit Kennzahlen und dem belegten Text](docs/screenshots/de/review.png)
-
-**Suchen ohne Sprachmodell** – über alle Bibliotheken; ausgewählte Einträge lassen sich als Literaturliste kopieren,
-exportieren oder befragen.
-
-![Suchen: Treffer mit drei ausgewählten Einträgen und der Auswahlleiste](docs/screenshots/de/search.png)
 
 ---
 
