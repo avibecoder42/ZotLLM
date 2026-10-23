@@ -17,7 +17,7 @@
 
 ZotLLM ist ein Programm für den Desktop, das mit Zotero zusammenarbeitet. Die Arbeit ist in **Projekte** gegliedert,
 jedes mit eigenen **Wissenskorpora**: Ein Korpus ist eine Auswahl von Zotero-Sammlungen oder ganzen Bibliotheken, auch
-aus Gruppen. ZotLLM liest die PDFs und weiteren Texte der Korpora samt gedruckten Seitenzahlen und indexiert sie auf dem
+aus Gruppen. ZotLLM liest die PDFs, Word-Dokumente und weiteren Texte der Korpora samt Seitenzahlen und indexiert sie auf dem
 eigenen Rechner. Fragen und Forschungsstände stützen sich dann genau auf die Texte des Projekts.
 
 <table>
@@ -84,7 +84,7 @@ schreiben. Je mehr davon man abgibt, desto weniger übt man es.
 
 ```
 Zotero 10 (lokale API)  ←→  ZotLLM-Dienst (Python, 127.0.0.1:23120)   ←→  LLM nach Wahl
-  + schlankes Plugin           – Text + Seitenzahlen aus PDF/EPUB/HTML        Claude · GPT · Gemini
+  + schlankes Plugin           – Text + Seitenzahlen aus PDF/EPUB/HTML/Word   Claude · GPT · Gemini
     (Rechtsklick, Autostart)   – Zerlegung, Literaturverzeichnisse erkennen   DeepSeek · lokal (Ollama)
                                – Embedding: eingebaut (llama.cpp), Ollama, OpenAI …
 Browser / Programmfenster ←→   – SQLite-Index: Volltextsuche + Vektoren
@@ -340,7 +340,7 @@ ausführen.
 ```
 src/zotllm/
   zotero/      Client für die lokale API (Lesen, Schreiben, Autorisierung)
-  extract/     PDF/EPUB/HTML-Text mit Seitenzahlen, Chunking, Literaturverzeichnis-Erkennung
+  extract/     PDF/EPUB/HTML/Word/ODT-Text mit Seitenzahlen, Chunking, Literaturverzeichnis-Erkennung
   embeddings/  eingebaut (llama.cpp: Laufzeit, Katalog, Download, Kurztest, Namenssuche), Ollama, OpenAI, Gemini, …
   llm/         Anthropic, OpenAI/DeepSeek/Ollama, Gemini – gemeinsame Schnittstelle
   index/       SQLite (FTS5 + Vektoren je Embedding-Raum), Indexierer, Dubletten

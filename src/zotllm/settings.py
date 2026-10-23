@@ -13,6 +13,10 @@ from zotllm import paths
 
 Effort = Literal["", "low", "medium", "high", "xhigh", "max"]
 
+# Word (.docx) und OpenDocument-Text (.odt) – lesbar ab Version 0.9.0 (Einstellungen der Version 2)
+OFFICE_TYPES = ["application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.oasis.opendocument.text"]
+
 
 class ZoteroSettings(BaseModel):
     api_url: str = "http://127.0.0.1:23119"
@@ -25,7 +29,7 @@ class IndexingSettings(BaseModel):
     mode: Literal["manual", "background"] = "manual"
     interval_minutes: int = Field(10, ge=1, le=1440)
     content_types: list[str] = Field(
-        default_factory=lambda: ["application/pdf", "application/epub+zip", "text/html"]
+        default_factory=lambda: ["application/pdf", "application/epub+zip", "text/html", *OFFICE_TYPES]
     )
     # Seiten mit weniger Zeichen gelten als Scan ohne Textebene
     min_chars_per_page: int = Field(40, ge=0)
@@ -159,7 +163,7 @@ class ServerSettings(BaseModel):
 
 
 class Settings(BaseModel):
-    version: int = 1
+    version: int = 2
     # Sprache der Oberfläche (Wörterbücher in static/js/i18n) und der KI-Ausgaben („auto“ = Sprache der Frage)
     language: str = Field("de", pattern=r"^[a-z]{2}$")
     output_language: str = Field("auto", pattern=r"^(auto|[a-z]{2})$")
@@ -196,6 +200,16 @@ def _deep_merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _migrate(raw: dict[str, Any]) -> dict[str, Any]:
+    """Gespeicherte Einstellungen älterer Versionen ergänzen (die Datei enthält alle Werte, auch Standardwerte)."""
+    if int(raw.get("version") or 1) < 2:
+        types = (raw.get("indexing") or {}).get("content_types")
+        if isinstance(types, list):  # Word und OpenDocument lesen (neu in 0.9.0)
+            raw["indexing"]["content_types"] = types + [t for t in OFFICE_TYPES if t not in types]
+        raw["version"] = 2
+    return raw
+
+
 class SettingsStore:
     """Thread-sichere Verwaltung der Einstellungen mit atomarem Speichern."""
 
@@ -210,7 +224,7 @@ class SettingsStore:
             return Settings()
         try:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
-            return Settings.model_validate(_deep_merge(Settings().model_dump(), raw))
+            return Settings.model_validate(_deep_merge(Settings().model_dump(), _migrate(raw)))
         except (ValueError, ValidationError):
             backup = self.path.with_suffix(".invalid.json")
             os.replace(self.path, backup)

@@ -33,7 +33,7 @@ from zotllm.rag.markdown import md_to_html
 from zotllm.rag.prompts import LANG_NAMES
 from zotllm.rag.sources import _merge_overlapping, author_year
 from zotllm.retrieval import Searcher
-from zotllm.zotero import ZoteroAuthRequired, ZoteroError, zotero_open_pdf_url, zotero_select_url
+from zotllm.zotero import ZoteroAuthRequired, ZoteroError, opens_in_reader, zotero_open_pdf_url, zotero_select_url
 
 log = logging.getLogger(__name__)
 
@@ -684,8 +684,10 @@ class ReviewService:
 
     def _pdf_attachment(self, lib: str, item_key: str) -> dict | None:
         atts = self.store.attachments_for_item(lib, item_key)
+        # Nur Anhänge, die Zotero selbst an einer Seite öffnet – Word & Co. verlinken auf den Eintrag
         return next((a for a in atts if a["content_type"] == "application/pdf" and a["status"] == "indexed"),
-                    next((a for a in atts if a["content_type"] == "application/pdf"), atts[0] if atts else None))
+                    next((a for a in atts if a["content_type"] == "application/pdf"),
+                         next((a for a in atts if opens_in_reader(a["content_type"])), None)))
 
     def _has_page_labels(self, lib: str, item_key: str) -> bool:
         """Ist der Text mit Erkennung der gedruckten Seitenzahlen indexiert? Nein, solange ein Anhang noch auf das

@@ -196,6 +196,15 @@ class Indexer:
             summary["items"] += counts["items"]
             summary["attachments"] += counts["attachments"]
 
+            # Anhänge, die früher als nicht lesbar übersprungen wurden (z. B. Word vor 0.9.0): jetzt vormerken
+            for key in self.store.skipped_attachments(lib, self.engine.settings.indexing.content_types):
+                try:
+                    p = zot.file_path(lib, {"key": key})
+                except ZoteroError:
+                    continue
+                self.store.activate_attachment(lib, key, str(p) if p else None)
+                summary["attachments"] += 1
+
             # Geänderte Dateien (z. B. ersetzte PDF) – ohne Zotero, direkt über das Dateisystem.
             # Hat sich nur die Änderungszeit geändert (z. B. Datenordner kopiert), entscheidet die Prüfsumme –
             # so wird nach einem Umzug nicht die ganze Bibliothek neu indexiert.

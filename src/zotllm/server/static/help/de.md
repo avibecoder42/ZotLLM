@@ -242,6 +242,14 @@ Die Liste der Probleme führt jeden Anhang einzeln auf. Hat ein Eintrag mehrere 
 
 Gespeicherte Webseiten (Schnappschüsse, HTML) werden nur indexiert, wenn der Eintrag keine PDF bzw. EPUB hat. Sonst stünde derselbe Text doppelt im Index – samt Menüs und Literaturliste der Verlagsseite – und Antworten zeigten doppelte Fundstellen. Liefert die PDF keinen Text oder wird sie gelöscht, liest ZotLLM beim nächsten Indexieren den Schnappschuss.
 
+### Word- und LibreOffice-Dokumente
+
+Neben PDF, EPUB und Webseiten liest ZotLLM auch **Word-Dateien (.docx)** und **LibreOffice-Dokumente (.odt)**, die in Zotero als Anhang gespeichert sind: Haupttext mit Überschriften, Listen und Tabellen; Fuss- und Endnoten stehen am Ende ihrer Seite bzw. des Dokuments. Bei Dokumenten mit nachverfolgten Änderungen gilt der aktuelle Stand. Kopf- und Fusszeilen, Kommentare und Verzeichnisse werden nicht gelesen. Das alte Word-Format (.doc) wird nicht unterstützt – in Word mit **Speichern unter → Word-Dokument (.docx)** umwandeln.
+
+**Seitenzahlen:** Word und LibreOffice merken sich beim Speichern, wo die Seiten umbrechen. Diese Angaben übernimmt ZotLLM, einschliesslich einer abweichenden ersten Seitenzahl. Es sind die Seiten, wie das Dokument beim letzten Speichern umbrochen war – auf einem anderen Rechner oder mit anderen Schriften können sie leicht abweichen. Fehlen die Angaben (z. B. bei einem Export aus Google Docs), lauten die Belege „o. S.“.
+
+Ein Klick auf einen Beleg zeigt die Textstelle wie gewohnt. Weil Zotero Word-Dateien nicht selbst anzeigt, gibt es statt **PDF öffnen** nur **In Zotero zeigen**; von dort öffnet ein Doppelklick das Dokument.
+
 ## Suchen
 
 Die Ansicht **Suchen** ist eine Suchmaschine über die ganze Zotero-Bibliothek – die eigene und alle Gruppen. Sie braucht kein Sprachmodell und ist daher schnell und kostenlos.

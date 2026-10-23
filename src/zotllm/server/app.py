@@ -44,7 +44,7 @@ from zotllm.service import BackgroundScheduler, launcher_command
 from zotllm.settings import EmbeddingSettings, Settings
 from zotllm.updates import version_tuple
 from zotllm.index.store import strip_bidi
-from zotllm.zotero import (ZoteroAuthRequired, ZoteroError, ZoteroUnavailable, zotero_open_pdf_url,
+from zotllm.zotero import (ZoteroAuthRequired, ZoteroError, ZoteroUnavailable, opens_in_reader, zotero_open_pdf_url,
                               zotero_select_url)
 from zotllm.zotero.tree import describe_sources, fetch_tree
 
@@ -934,7 +934,7 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
         raw = indexer.scope(corpus_id=cid, resolve=False)
         scope = engine.resolve_copies(raw)
         rows = engine.store.con.execute(
-            "SELECT lib, key, parent, title, status, error, n_pages, n_chunks, indexed_at FROM attachments"
+            "SELECT lib, key, parent, title, content_type, status, error, n_pages, n_chunks, indexed_at FROM attachments"
             " WHERE status NOT IN ('skipped','redundant')").fetchall()
         rows = [dict(r) for r in rows if (r["lib"], r["parent"]) in scope]
         items = engine.store.items({(r["lib"], r["parent"]) for r in rows})
@@ -951,7 +951,8 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
                      "creators": strip_bidi(it.get("creator_summary") or ""), "year": it.get("year"),
                      "pages": r["n_pages"], "chunks": r["n_chunks"], "status": r["status"], "error": r["error"],
                      "select": zotero_select_url(r["lib"], r["parent"]),
-                     "pdf": zotero_open_pdf_url(r["lib"], r["key"]) if r["status"] == "indexed" else None,
+                     "pdf": zotero_open_pdf_url(r["lib"], r["key"])
+                     if r["status"] == "indexed" and opens_in_reader(r.get("content_type")) else None,
                      "missing": (coverage.get((r["lib"], r["key"])) or (0, 0))[1],
                      "copy_from": tr_exact(lib_names.get(r["lib"], r["lib"])) if (r["lib"], r["parent"]) not in raw
                      else None}

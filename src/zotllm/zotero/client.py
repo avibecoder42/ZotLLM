@@ -402,6 +402,15 @@ def zotero_select_url(lib: str, item_key: str, collection_key: str | None = None
     return f"zotero://select/{_lib_path(lib)}/items/{quote(item_key)}"
 
 
+# Dateitypen, die Zotero im eigenen Reader öffnet (an einer Seite); Word & Co. öffnet es extern ohne Seitensprung
+READER_TYPES = ("application/pdf", "application/epub+zip", "text/html")
+
+
+def opens_in_reader(content_type: str | None) -> bool:
+    """Lässt sich der Anhang mit zotero://open-pdf öffnen? Unbekannter Typ (ältere Daten): wie bisher ja."""
+    return not content_type or content_type in READER_TYPES
+
+
 def zotero_open_pdf_url(lib: str, att_key: str, page_index: int | None = None) -> str:
     """page_index ist 0-basiert; Zotero erwartet die 1-basierte Seitennummer im PDF."""
     url = f"zotero://open-pdf/{_lib_path(lib)}/items/{quote(att_key)}"

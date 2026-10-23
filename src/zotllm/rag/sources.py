@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from zotllm.extract.chunker import estimate_tokens
 from zotllm.index.store import Store, strip_bidi
 from zotllm.retrieval.search import Hit
-from zotllm.zotero import zotero_open_pdf_url, zotero_select_url
+from zotllm.zotero import opens_in_reader, zotero_open_pdf_url, zotero_select_url
 
 
 def author_year(item: dict) -> str:
@@ -41,6 +41,7 @@ class Source:
     kind: str
     score: float
     relevance: dict | None = None
+    content_type: str = ""  # Dateityp des Anhangs; „PDF öffnen“ nur, wenn Zotero ihn selbst anzeigt
 
     @property
     def page_text(self) -> str:
@@ -62,7 +63,7 @@ class Source:
             "kind": self.kind, "score": round(self.score, 5), "relevance": self.relevance,
             "zotero_select": zotero_select_url(self.lib, self.item_key),
         }
-        if self.att_key:
+        if self.att_key and opens_in_reader(self.content_type):
             d["zotero_pdf"] = zotero_open_pdf_url(self.lib, self.att_key, self.page_index)
         return d
 
@@ -115,12 +116,14 @@ def build_sources(store: Store, hits: list[Hit], neighbor_chunks: int, token_bud
         if sources and used + tokens > token_budget:
             break
         used += tokens
+        att = store.attachment(c["lib"], c["att_key"]) if c.get("att_key") else None
         sources.append(Source(
             n=len(sources) + 1, chunk_id=c["id"], lib=c["lib"], item_key=c["item_key"], att_key=c.get("att_key") or "",
             title=h.item.get("title") or "(ohne Titel)", citation=author_year(h.item),
             page_label=c.get("page_label") or "", page_index=c.get("page_start"), text=text, kind=c.get("kind", "text"),
             score=h.rerank_score if h.rerank_score is not None else h.score,
             relevance=relevance_info(h, best_vector, best_keyword, len(sources) + 1, len(hits)),
+            content_type=(att or {}).get("content_type") or "",
         ))
     for s in sources:
         s.relevance["of"] = len(sources)

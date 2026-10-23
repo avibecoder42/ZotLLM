@@ -288,6 +288,12 @@ def extract_file(
         raw = path.read_bytes()
         html = raw.decode("utf-8", errors="replace")
         return text_as_document(html_to_text(html), "html")
+    from zotllm.extract import office  # hier, weil office die Datenklassen aus diesem Modul verwendet
+
+    if ct == office.DOCX_TYPE or suffix == ".docx":
+        return office.extract_docx(path, max_pages=max_pages)
+    if ct == office.ODT_TYPE or suffix == ".odt":
+        return office.extract_odt(path, max_pages=max_pages)
     if ct.startswith("text/") or suffix in (".txt", ".md"):
         return text_as_document(path.read_text(encoding="utf-8", errors="replace"), "text")
     raise ValueError(f"Nicht unterstützter Dateityp: {content_type or suffix}")

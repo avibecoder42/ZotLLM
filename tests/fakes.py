@@ -126,6 +126,17 @@ class FakeZotero:
             "links": {"enclosure": {"href": path.as_uri(), "type": "text/html"}},
         }
 
+    def add_file(self, key, parent, path: Path, content_type: str):
+        """Beliebige gespeicherte Datei (z. B. Word) als Anhang."""
+        self.version += 1
+        self.items[key] = {
+            "key": key, "version": self._ver(),
+            "data": {"key": key, "itemType": "attachment", "parentItem": parent, "linkMode": "imported_file",
+                     "contentType": content_type, "title": path.name, "filename": path.name,
+                     "md5": hashlib.md5(path.read_bytes()).hexdigest(), "mtime": 1},
+            "links": {"enclosure": {"href": path.as_uri(), "type": content_type}},
+        }
+
     def add_link(self, key, parent, url="https://example.org"):
         self.version += 1
         self.items[key] = {"key": key, "version": self._ver(),
@@ -215,6 +226,10 @@ class FakeZotero:
         m = re.fullmatch(rf"/api/{lib}/items/(\w+)/fulltext", path)
         if m:
             return self._resp(404, text="Not found")
+        m = re.fullmatch(rf"/api/{lib}/items/(\w+)/file/view/url", path)
+        if m and m.group(1) in self.items:
+            href = ((self.items[m.group(1)].get("links") or {}).get("enclosure") or {}).get("href")
+            return self._resp(200, text=href) if href else self._resp(404, text="Not found")
         m = re.fullmatch(rf"/api/{lib}/items/(\w+)", path)
         if m and m.group(1) in self.items:
             item = self.items[m.group(1)]

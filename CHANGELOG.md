@@ -2,6 +2,20 @@
 
 All notable changes, newest first.
 
+## 0.9.0 – 2026-10-23
+
+### New
+- **Word and LibreOffice documents:** ZotLLM now also reads Word files (.docx) and LibreOffice documents (.odt) stored
+  as attachments in Zotero – the main text with headings, lists and tables; footnotes and endnotes follow at the end of
+  their page or of the document. For tracked changes, the current state counts; headers, footers, comments and indexes
+  are left out. The old Word format (.doc) is not supported.
+  - **Page numbers** come from the page breaks Word or LibreOffice recorded when the document was last saved,
+    including a different first page number. Without them (e.g. a Google Docs export), citations read "o. S." (n.p.).
+  - Word attachments already in your library are picked up at the next sync with Zotero and read in the next indexing
+    run; existing settings are extended automatically.
+  - Citations of Word documents offer "Show in Zotero" instead of "Open PDF", because Zotero does not display Word files
+    itself.
+
 ## 0.8.1 – 2026-10-21
 
 First public release.

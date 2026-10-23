@@ -623,6 +623,19 @@ class Store:
                  d.get("linkMode", ""), path, d.get("md5"), d.get("mtime"), status),
             )
 
+    def skipped_attachments(self, lib: str, content_types: list[str]) -> list[str]:
+        """Übersprungene Anhänge, deren Dateityp inzwischen lesbar ist (z. B. Word ab 0.9.0)."""
+        ph = ",".join("?" * len(content_types)) or "''"
+        return [r[0] for r in self.con.execute(
+            f"SELECT key FROM attachments WHERE lib=? AND status='skipped' AND link_mode!='linked_url'"
+            f" AND content_type IN ({ph})", [lib, *content_types])]
+
+    def activate_attachment(self, lib: str, key: str, path: str | None) -> None:
+        """Übersprungenen Anhang zum Lesen vormerken."""
+        with self.write() as con:
+            con.execute("UPDATE attachments SET status='pending', path=? WHERE lib=? AND key=? AND status='skipped'",
+                        (path, lib, key))
+
     def attachment(self, lib: str, key: str) -> dict | None:
         row = self.con.execute("SELECT * FROM attachments WHERE lib=? AND key=?", (lib, key)).fetchone()
         return dict(row) if row else None

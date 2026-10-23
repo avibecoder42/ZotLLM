@@ -241,6 +241,14 @@ The list of problems shows each attachment separately. An item with several atta
 
 Saved web pages (snapshots, HTML) are only indexed if the item has no PDF or EPUB. Otherwise the same text would be in the index twice – including the menus and reference list of the publisher's page – and answers would show duplicate passages. If the PDF yields no text or is deleted, ZotLLM reads the snapshot at the next indexing run.
 
+### Word and LibreOffice documents
+
+Besides PDF, EPUB and web pages, ZotLLM also reads **Word files (.docx)** and **LibreOffice documents (.odt)** stored as attachments in Zotero: the main text with headings, lists and tables; footnotes and endnotes follow at the end of their page or of the document. For documents with tracked changes, the current state counts. Headers and footers, comments and indexes are not read. The old Word format (.doc) is not supported – convert it in Word with **Save as → Word Document (.docx)**.
+
+**Page numbers:** Word and LibreOffice record where the pages break when a document is saved. ZotLLM uses this, including a different first page number. These are the pages as the document was laid out when last saved – on another computer or with other fonts they may differ slightly. Without this information (e.g. a Google Docs export), citations read "o. S." (n.p.).
+
+Clicking a citation shows the passage as usual. Because Zotero does not display Word files itself, there is **Show in Zotero** instead of **Open PDF**; from there, a double-click opens the document.
+
 ## Search
 
 The **Search** view is a search engine for the whole Zotero library – your own and all groups. It needs no language model and is therefore fast and free.

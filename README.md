@@ -17,7 +17,7 @@
 
 ZotLLM is a desktop application that works alongside Zotero. You organise your work in **projects**, each with its own
 **knowledge corpora**: a corpus is a selection of Zotero collections or whole libraries, group libraries included.
-ZotLLM reads the PDFs and other texts of the corpora, keeps their printed page numbers and indexes them on your
+ZotLLM reads the PDFs, Word documents and other texts of the corpora, keeps their page numbers and indexes them on your
 computer. Questions and literature reviews then draw on exactly the texts that belong to the project.
 
 <table>
@@ -82,7 +82,7 @@ over, the less of it you practise.
 
 ```
 Zotero 10 (local API)  ←→  ZotLLM service (Python, 127.0.0.1:23120)  ←→  LLM of your choice
-  + slim plugin               – text + page numbers from PDF/EPUB/HTML        Claude · GPT · Gemini
+  + slim plugin               – text + page numbers from PDF/EPUB/HTML/Word   Claude · GPT · Gemini
     (context menu, autostart) – chunking, reference-list detection            DeepSeek · local (Ollama)
                               – embedding: built in (llama.cpp), Ollama, OpenAI …
 Browser / app window  ←→      – SQLite index: full-text search + vectors
@@ -311,7 +311,7 @@ For the built-in runtime during development, run `python packaging/fetch_llama.p
 ```
 src/zotllm/
   zotero/      client for the local API (read, write, authorisation)
-  extract/     PDF/EPUB/HTML text with page numbers, chunking, reference-list detection
+  extract/     PDF/EPUB/HTML/Word/ODT text with page numbers, chunking, reference-list detection
   embeddings/  built in (llama.cpp: runtime, catalog, download, short test, name search), Ollama, OpenAI, Gemini, …
   llm/         Anthropic, OpenAI/DeepSeek/Ollama, Gemini – one interface
   index/       SQLite (FTS5 + vectors per embedding space), indexer, duplicates
