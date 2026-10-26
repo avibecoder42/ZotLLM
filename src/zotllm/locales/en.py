@@ -395,4 +395,31 @@ MESSAGES: dict[str, str] = {
     "Für eines der Modelle gibt es keinen Index.": "There is no index for one of the models.",
     "Der Index enthält keine Vektoren.": "The index contains no vectors.",
     "Die Dimension der Vektoren unterscheidet sich.": "The vector dimension differs.",
+
+    # -- Word und OpenDocument (0.9.0) ------------------------------------------------------------
+    "Keine Word-Datei (word/document.xml fehlt)": "Not a Word file (word/document.xml is missing)",
+    "Keine OpenDocument-Datei (content.xml fehlt)": "Not an OpenDocument file (content.xml is missing)",
+    "{name} ist zu gross ({mb} MB entpackt)": "{name} is too large ({mb} MB unpacked)",
+
+    # -- CSL-Editor (0.10.0) ----------------------------------------------------------------------
+    "Der Stil ist zu gross.": "The style is too large.",
+    "Kein gültiges XML: {e}": "Not valid XML: {e}",
+    "Keine CSL-Datei: Das Wurzelelement muss <style> (CSL 1.0) sein.": "Not a CSL file: the root element must be <style> (CSL 1.0).",
+    "Dem Stil fehlt der Abschnitt <info>.": "The style lacks the <info> section.",
+    "Das Attribut version=\"1.0\" fehlt am Element <style>.": "The attribute version=\"1.0\" is missing on the <style> element.",
+    "Der Stil hat keinen Titel.": "The style has no title.",
+    "Dem Stil fehlt der Abschnitt <citation> (Belege im Text).": "The style lacks the <citation> section (in-text citations).",
+    "Ungültiger Name des Stils.": "Invalid style name.",
+    "Ungültiger Stilname.": "Invalid style name.",
+    "zotero.org ist nicht erreichbar ({e}).": "zotero.org cannot be reached ({e}).",
+    "Unerwartete Antwort von zotero.org.": "Unexpected response from zotero.org.",
+    "zotero.org antwortet mit Fehler {code}.": "zotero.org responds with error {code}.",
+    "Der Elternstil liegt nicht auf zotero.org.": "The parent style is not on zotero.org.",
+    "Diesen Stil gibt es auf zotero.org nicht.": "This style does not exist on zotero.org.",
+    "Für diesen abhängigen Stil fehlt der Elternstil.": "The parent style of this dependent style is missing.",
+    "Stil nicht gefunden": "Style not found",
+    "Version nicht gefunden": "Version not found",
+    "Für das direkte Installieren braucht es das ZotLLM-Plugin ab Version 0.10.0.":
+        "Installing directly requires the ZotLLM plugin version 0.10.0 or later.",
+    "Zotero konnte den Stil nicht installieren: {detail}": "Zotero could not install the style: {detail}",
 }

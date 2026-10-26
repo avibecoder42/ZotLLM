@@ -52,7 +52,7 @@ log = logging.getLogger(__name__)
 STATIC = Path(__file__).parent / "static"
 CSRF_HEADER = "x-zotllm"
 LEGACY_CSRF_HEADER = "x-zoterollm"  # Plugin und Installer bis 0.7.3 (damals „ZoteroLLM“)
-STATIC_VERSIONED = re.compile(r"^/static/v[\w.+-]+/(.+)$")
+STATIC_VERSIONED = re.compile(r"^/static/v\d[\w.+-]*/(.+)$")  # v0.9.0 – nicht der Ordner „vendor“
 # Ältere Plugins kennen die Schnittstelle /zotllm/uris (Word-Belege) noch nicht; bis 0.7.3 hiess das Plugin „ZoteroLLM“
 PLUGIN_MIN_VERSION = "0.8.0"
 RENAMED_IN = "0.8.0"
@@ -1230,6 +1230,148 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
         from zotllm.zotero import styles as zstyles
 
         return _style_analysis(zstyles.normalize_style_id(id), zstyles.zotero_data_dir(engine.store))
+
+    # -- CSL-Editor --------------------------------------------------------------------------------
+    from zotllm import csl_editor as csl
+
+    csl_state: dict = {}
+
+    def csl_repo() -> csl.Repository:
+        if "repo" not in csl_state:
+            csl_state["repo"] = csl.Repository()
+        return csl_state["repo"]
+
+    def csl_call(fn, *args):
+        try:
+            return fn(*args)
+        except csl.CslError as e:
+            raise HTTPException(400, str(e)) from e
+
+    def csl_own(slug: str) -> str:
+        try:
+            return csl.StyleStore.default().get(slug)
+        except (KeyError, csl.CslError) as e:
+            raise HTTPException(404, "Stil nicht gefunden") from e
+
+    @app.get("/api/csl/repository")
+    def csl_search(q: str = "", format: str = "", field: str = ""):
+        """Stilsammlung von zotero.org durchsuchen (Liste nur bei Bedarf geladen, danach zwischengespeichert)."""
+        return csl_call(csl_repo().search, q, format, field)
+
+    @app.get("/api/csl/repository/{name}")
+    def csl_repository_style(name: str):
+        return csl_call(csl_repo().fetch, name)
+
+    @app.get("/api/csl/zotero")
+    def csl_zotero_styles():
+        from zotllm.zotero import styles as zstyles
+
+        return {"styles": [s.as_dict() for s in zstyles.installed_styles(zstyles.zotero_data_dir(engine.store))]}
+
+    @app.get("/api/csl/zotero/style")
+    def csl_zotero_style(id: str):
+        """CSL eines in Zotero installierten Stils; bei abhängigen Stilen auch der Elternstil (installiert, als
+        verborgener Stil oder von zotero.org)."""
+        from zotllm.zotero import styles as zstyles
+
+        data_dir = zstyles.zotero_data_dir(engine.store)
+        by_id = {s.id: s for s in zstyles.installed_styles(data_dir)}
+        style = by_id.get(zstyles.normalize_style_id(id))
+        if not style:
+            raise HTTPException(404, "Stil nicht gefunden")
+        xml = style.file.read_text(encoding="utf-8")
+        parent_xml = None
+        if style.parent:
+            parent = by_id.get(style.parent)
+            hidden = data_dir / "styles" / "hidden" if data_dir else None
+            if not parent and hidden and hidden.is_dir():
+                parent = next((s for f in hidden.glob("*.csl") if (s := zstyles._info(f)) and s.id == style.parent), None)
+            if parent:
+                parent_xml = parent.file.read_text(encoding="utf-8")
+            elif style.parent.replace("http://", "https://", 1).startswith(csl.REPO_PREFIX):
+                parent_xml = csl_call(csl_repo().fetch, style.parent.rstrip("/").rsplit("/", 1)[-1])["xml"]
+        return {"xml": xml, "parent_xml": parent_xml, "info": csl_call(csl.info, xml)}
+
+    @app.get("/api/csl/styles")
+    def csl_styles():
+        return {"styles": csl.StyleStore.default().list()}
+
+    @app.post("/api/csl/styles")
+    def csl_create(body: dict = Body(...)):
+        """Eigenen Stil anlegen: Kopie eines Stils (bei abhängigen Stilen des Elternstils) mit eigenem Namen und
+        eigener Kennung, damit das Original beim Installieren nicht überschrieben wird."""
+        base, title, template = csl_call(csl.editable_copy, body.get("xml") or "", body.get("parent_xml"),
+                                         (body.get("title") or "").strip() or None)
+        slug, xml = csl_call(csl.StyleStore.default().create, base, title, template)
+        return {"slug": slug, "xml": xml, "info": csl.info(xml), "versions": []}
+
+    @app.get("/api/csl/styles/{slug}")
+    def csl_style(slug: str):
+        xml = csl_own(slug)
+        return {"slug": slug, "xml": xml, "info": csl_call(csl.info, xml),
+                "versions": csl.StyleStore.default().versions(slug)}
+
+    @app.put("/api/csl/styles/{slug}")
+    def csl_save(slug: str, body: dict = Body(...)):
+        xml = body.get("xml") or ""
+        csl_own(slug)
+        problems = csl_call(csl.check, xml)
+        if problems:
+            raise HTTPException(400, " ".join(problems))
+        out = csl_call(csl.StyleStore.default().save, slug, xml)
+        return {"slug": slug, "xml": out, "info": csl.info(out), "versions": csl.StyleStore.default().versions(slug)}
+
+    @app.get("/api/csl/styles/{slug}/versions/{name}")
+    def csl_version(slug: str, name: str):
+        try:
+            return {"xml": csl.StyleStore.default().version(slug, name)}
+        except KeyError as e:
+            raise HTTPException(404, "Version nicht gefunden") from e
+
+    @app.delete("/api/csl/styles/{slug}")
+    def csl_delete(slug: str):
+        csl_own(slug)
+        csl.StyleStore.default().delete(slug)
+        return {"deleted": slug}
+
+    @app.post("/api/csl/styles/{slug}/install")
+    def csl_install(slug: str):
+        """In Zotero installieren (über das ZotLLM-Plugin) – danach auch in ZotLLM als Zitierstil wählbar."""
+        from zotllm.zotero import PluginMissing
+        from zotllm.zotero import styles as zstyles
+
+        xml = csl_own(slug)
+        try:
+            engine.zotero().install_style(xml)
+        except PluginMissing as e:
+            raise HTTPException(409, str(e)) from e
+        except ZoteroUnavailable as e:
+            raise HTTPException(503, str(e)) from e
+        except ZoteroError as e:
+            raise HTTPException(502, str(e)) from e
+        zstyles._cache.clear()
+        return {"installed": True, "id": csl.info(xml)["id"]}
+
+    @app.post("/api/csl/items")
+    def csl_items(body: dict = Body(...)):
+        """Eigene Zotero-Einträge als CSL-JSON für die Vorschau (aus Zotero, sonst aus den gespeicherten Angaben)."""
+        from zotllm.exporting import Citations
+
+        keys = []
+        for ref in (body.get("items") or [])[:20]:
+            lib, _, key = str(ref).partition(":")
+            if lib and key:
+                keys.append((lib, key))
+        if not keys:
+            return {"items": []}
+        cites = Citations(engine, keys, engine.settings.citation_style, engine.settings.language)
+        out = []
+        for k in keys:
+            item = dict(cites.csl.get(k) or {})
+            if item:
+                item["id"] = f"{k[0]}:{k[1]}"
+                out.append(item)
+        return {"items": out}
 
     # -- Presets -----------------------------------------------------------------------------------
     @app.get("/api/presets")

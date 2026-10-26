@@ -15,9 +15,10 @@ import { indexView } from './indexing.js';
 import { reviewView } from './review.js';
 import { settingsView } from './settings.js';
 import { helpView, openHelp } from './help.js';
+import { cslEditorView } from './csleditor.js';
 import { projectBadge, switcherItems } from './projects.js';
 
-// Ansichten des aktiven Projekts (Strg+1–5); Index, Hilfe und Einstellungen gelten für alle Projekte (unten)
+// Ansichten des aktiven Projekts (Strg+1–5); CSL-Editor, Index, Hilfe und Einstellungen gelten für alle Projekte (unten)
 export const VIEWS = [
   { id: 'start', icon: 'home', label: () => t('Projekt') },
   { id: 'search', icon: 'search', label: () => t('Suchen') },
@@ -26,6 +27,7 @@ export const VIEWS = [
   { id: 'corpora', icon: 'corpus', label: () => t('Korpora') },
 ];
 export const GLOBAL_VIEWS = [
+  { id: 'csl', icon: 'cslStyle', label: () => t('CSL-Editor'), key: 'Strg+7' },
   { id: 'index', icon: 'index', label: () => t('Index'), key: 'Strg+6' },
   { id: 'help', icon: 'help', label: () => t('Hilfe'), key: 'F1' },
   { id: 'settings', icon: 'settings', label: () => t('Einstellungen'), key: 'Strg+,' },
@@ -223,7 +225,7 @@ export function shell() {
 
 function currentView() {
   const views = { setup: setupView, start: startView, search: searchView, ask: askView, corpora: corporaView, index: indexView,
-    review: reviewView, settings: settingsView, help: helpView };
+    review: reviewView, settings: settingsView, help: helpView, csl: cslEditorView };
   return (views[state.view] || setupView)();
 }
 
@@ -253,6 +255,7 @@ export function handleKey(e) {
   const mod = e.ctrlKey || e.metaKey;
   if (mod && /^[1-5]$/.test(e.key)) { e.preventDefault(); navigate(VIEWS[Number(e.key) - 1].id); return; }
   if (mod && e.key === '6') { e.preventDefault(); navigate('index'); return; }
+  if (mod && e.key === '7') { e.preventDefault(); navigate('csl'); return; }
   if (mod && e.key === ',') { e.preventDefault(); navigate('settings'); return; }
   if (mod && (e.key === 'p' || e.key === 'P')) { e.preventDefault(); openProjectSwitcher(); return; }
   if (e.key === 'F1') { e.preventDefault(); openHelp(); return; }

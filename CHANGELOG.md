@@ -2,6 +2,28 @@
 
 All notable changes, newest first.
 
+## 0.10.0 – 2026-10-26
+
+### New
+- **CSL editor** (new tab, Ctrl+7): find, adapt and install citation styles.
+  - Search the roughly 10,000 styles on zotero.org (the list is only loaded when you search – about 300 KB once,
+    afterwards only when it has changed), open styles installed in Zotero or import a .csl file.
+  - Other styles are adopted as a copy with their own name and ID, so the original is never overwritten; dependent
+    styles become an independent copy of their parent style.
+  - Preview with citeproc-js, the software Zotero itself uses: in-text citations and bibliography entries for nine
+    typical document types, plus your own Zotero items, in a choice of languages.
+  - Click a part of a citation to edit exactly that part: text before and after, italic, bold, small caps,
+    capitalisation, name format ("and" or "&", initials, order, "et al."), date form, page labels; move, remove or add
+    fields. Parts used in several places are flagged, and the examples changed by the last edit are marked.
+  - Code view with live preview and error messages, undo/redo, earlier versions.
+  - "Install in Zotero" uses the ZotLLM plugin and Zotero's own install function: the style is immediately available in
+    Zotero, in the Word plugin and in ZotLLM. Without the current plugin, the style is saved as a .csl file.
+- The Zotero plugin can install styles from the CSL editor – reinstall it once (Settings → Zotero and export → Save
+  plugin).
+
+### Fixed
+- Static files in folders starting with "v" were mistaken for versioned paths.
+
 ## 0.9.0 – 2026-10-23
 
 ### New

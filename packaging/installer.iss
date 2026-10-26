@@ -4,7 +4,7 @@
 ; Die Update-Funktion im Programm startet das Setup unbeaufsichtigt (/SILENT) ohne Rückfrage.
 
 #ifndef AppVersion
-  #define AppVersion "0.9.0"
+  #define AppVersion "0.10.0"
 #endif
 #define AppName "ZotLLM"
 #define AppExe "ZotLLM.exe"

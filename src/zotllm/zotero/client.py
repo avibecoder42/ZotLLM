@@ -42,6 +42,10 @@ class ZoteroAuthRequired(ZoteroError):
     """Schreibzugriff wurde (noch) nicht freigegeben."""
 
 
+class PluginMissing(ZoteroError):
+    """Das ZotLLM-Plugin fehlt in Zotero oder ist zu alt für die gewünschte Funktion."""
+
+
 def file_url_to_path(url: str) -> Path | None:
     if not url or not url.startswith("file:"):
         return None
@@ -166,6 +170,20 @@ class ZoteroClient:
             return {k: v for k, v in (r.json().get("uris") or {}).items() if v}
         except ValueError:
             return {}
+
+    def install_style(self, xml: str) -> None:
+        """Eigenen Zitierstil über das ZotLLM-Plugin installieren (Zotero.Styles.install: sofort in Zotero und im
+        Word-Plugin verfügbar). Ohne Plugin ab 0.10.0: PluginMissing."""
+        r = self._request("POST", "/zotllm/styles/install", json={"style": xml},
+                          headers={"Zotero-Server-ID": self.server_id, "X-ZotLLM": "1"})
+        if r.status_code == 404:
+            raise PluginMissing("Für das direkte Installieren braucht es das ZotLLM-Plugin ab Version 0.10.0.")
+        if r.status_code >= 400:
+            try:
+                detail = r.json().get("error") or r.text
+            except ValueError:
+                detail = r.text
+            raise ZoteroError(f"Zotero konnte den Stil nicht installieren: {detail[:300]}")
 
     # -- Lesen ---------------------------------------------------------------------
     def library_version(self, lib: str) -> int:

@@ -1,4 +1,5 @@
 from zotllm.zotero.client import (
+    PluginMissing,
     ZoteroAuthRequired,
     ZoteroClient,
     ZoteroError,
@@ -9,6 +10,7 @@ from zotllm.zotero.client import (
 )
 
 __all__ = [
+    "PluginMissing",
     "ZoteroAuthRequired",
     "ZoteroClient",
     "ZoteroError",

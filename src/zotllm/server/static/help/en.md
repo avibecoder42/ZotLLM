@@ -26,7 +26,7 @@ Warning notices (brown background) can be hidden with the × at the top right. N
 ### Keyboard shortcuts
 
 - **Ctrl+1 … Ctrl+5** Project, Search, Ask, Literature review, Corpora
-- **Ctrl+6** Index, **Ctrl+,** Settings, **F1** Help
+- **Ctrl+6** Index, **Ctrl+7** CSL editor, **Ctrl+,** Settings, **F1** Help
 - **Ctrl+P** switch project
 - **Esc** closes menus, previews and dialogs
 - In input fields, **Enter** starts the search or sends the question; **Shift+Enter** inserts a new line in the question field.
@@ -395,6 +395,34 @@ How "o. S." goes into the Zotero citation in Word depends on the style; the sett
 - If the style puts **"p."** before the page (e.g. APA: "(Müller, 2019, p. 114)"), that would give "p. o. S."; then ", o. S." goes into the citation as a **suffix** (visible and editable in Word in the Zotero dialog of the citation), with the style's separator.
 
 Better change the style in ZotLLM later and export again rather than in Word: the marker is adapted to the chosen style. The marker text ("o. S.") can be changed or cleared under *Marker for missing page numbers*.
+
+## CSL editor
+
+Citation styles (CSL) define how citations and the bibliography look. In the **CSL editor** you adapt an existing style – for example your university's – and install it in Zotero. The preview uses **citeproc-js**, the same software Zotero uses to create citations: what you see is what appears in Word.
+
+### Finding and adopting styles
+
+On the left are three lists: **Mine** (styles edited in ZotLLM), **Zotero** (styles installed in Zotero) and **zotero.org** (search across the roughly 10,000 styles of the Zotero Style Repository, filterable by format). The zotero.org list is only loaded when you search (about 300 KB once) and afterwards only fetched again when it has changed. You can also import a .csl file.
+
+Other styles are shown in the preview first. **Use as my own style** creates a copy with its own name and ID – the original stays unchanged and is not overwritten when installing. For **dependent styles** (many journal styles only point to a parent style), an independent copy of the parent style is created.
+
+### Editing in the preview
+
+The preview shows in-text citations (with a page reference) and bibliography entries for typical document types: book, book chapter, journal article, article with four authors, newspaper article, web page, thesis, report and edited book. Add your own Zotero items below via the search. The preview language (terms such as "p." or "ed.") can be chosen.
+
+**Click a part of a citation**, for example the year: the panel on the right shows exactly that part's properties – text before and after, italic, bold, small caps, capitalisation; for names "and" or "&", order, initials and from how many names "et al." is used; for dates the form; for page references "p." or "page". The bar at the top of the panel shows where the part sits; clicking it selects the enclosing group. Parts can be moved, removed or followed by a new field.
+
+Many styles use macros in several places. If the selected part is inside such a macro, the panel says in how many places it applies. After each change the affected examples are marked ("The last change affects 5 of 9 examples"). Without a selection the panel shows settings for the whole style, e.g. "et al." in citations and bibliography, hanging indent or page ranges.
+
+### Code and earlier versions
+
+**Code** shows the style as XML. Changes appear in the preview immediately; errors are reported with line and column. **Go to selection** highlights the part selected in the preview. Whatever clicking does not cover (e.g. sorting, disambiguation, new conditions per document type) can be edited here.
+
+**Undo** and **Redo** (Ctrl+Z) apply to all changes. **Save** (Ctrl+S) keeps the previous version under **Earlier versions** (the last 30).
+
+### Installing in Zotero
+
+**Install in Zotero** hands the saved style to the ZotLLM plugin, which installs it with Zotero's own function. The style is then immediately available in Zotero, in the Word plugin and in ZotLLM (**Settings → Zotero and export**). Installing a changed style again replaces the earlier version in Zotero. Without a current plugin, ZotLLM saves the style as a .csl file; in Zotero, choose **Settings → Cite → "+"** and open the file.
 
 ## Settings
 

@@ -79,6 +79,9 @@ def licenses(target: str) -> None:
               "PyMuPDF / MuPDF: AGPL-3.0 (Quellcode: https://github.com/pymupdf/PyMuPDF)",
               f"llama.cpp {llama_build} (eingebaute Embedding-Laufzeit): MIT (https://github.com/ggml-org/llama.cpp)",
               "LLVM OpenMP (libomp, Teil von llama.cpp): Apache-2.0 WITH LLVM-exception",
+              "citeproc-js 2.4.63 (Vorschau im CSL-Editor): CPAL-1.0 oder AGPL-3.0 "
+              "(https://github.com/Juris-M/citeproc-js; Lizenztext in _internal/zotllm/server/static/vendor/citeproc)",
+              "CSL-Sprachdateien (citation-style-language/locales): CC BY-SA 3.0",
               "Microsoft Edge WebView2: Laufzeit von Microsoft (in Windows 10/11 enthalten)",
               "Embedding-Modelle werden nicht mitgeliefert; sie stehen unter den Lizenzen ihrer Hersteller "
               "(siehe Modellkatalog in den Einstellungen)."]

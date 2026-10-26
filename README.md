@@ -33,6 +33,9 @@ Language models are your choice: **Claude, ChatGPT (OpenAI), Gemini, DeepSeek** 
 API keys are stored encrypted in the operating system's key store. Runs on Windows; paths, key storage and start
 scripts are prepared for macOS and Linux.
 
+Also included: a **CSL editor** to find a citation style on zotero.org, adapt it by clicking on the preview and install
+it directly in Zotero.
+
 <p align="center"><img src="docs/screenshots/en/ask.png" alt="Ask: answer with numbered citations and the cited passage"></p>
 <p align="center"><sub>Answers with citations; a click shows the passage and its page. Demo library with fictitious sources.</sub></p>
 

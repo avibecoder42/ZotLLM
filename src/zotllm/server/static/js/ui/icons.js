@@ -62,6 +62,14 @@ const P = {
   compare: ['M4 4h7v16H4Z', 'M13 4h7v16h-7Z', 'M6.5 8h2', 'M15.5 8h2', 'M6.5 12h2', 'M15.5 12h2'],
   shield: ['M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6Z', 'M8.5 12l2.5 2.5 4.5-5'],
   queue: ['M4 6h11', 'M4 12h11', 'M4 18h7', 'M18 15v6', 'M15.5 18.5 18 21l2.5-2.5'],
+  // CSL-Editor: Textzeilen eines Belegs mit Stift
+  cslStyle: ['M4 6h12', 'M4 10h9', 'M4 14h6', 'M13 20l1-4 6.5-6.5 3 3L17 19Z'],
+  undo: ['M9 14 4 9l5-5', 'M4 9h10a6 6 0 0 1 0 12h-3'],
+  redo: ['M15 14l5-5-5-5', 'M20 9H10a6 6 0 0 0 0 12h3'],
+  upload: ['M12 15V3', 'M7 8l5-5 5 5', 'M4 17v3h16v-3'],
+  save: ['M5 4h11l3 3v13H5Z', 'M8 4v5h7V4', 'M8 20v-6h8v6'],
+  arrowLeft: ['M19 12H5', 'M11 6l-6 6 6 6'],
+  arrowRight: ['M5 12h14', 'M13 6l6 6-6 6'],
 };
 
 export function icon(name, size = 18, cls = '') {

@@ -26,7 +26,7 @@ Warnhinweise (braun hinterlegt) lassen sich mit dem × oben rechts ausblenden. H
 ### Tastenkürzel
 
 - **Strg+1 … Strg+5** Projekt, Suchen, Fragen, Forschungsstand, Korpora
-- **Strg+6** Index, **Strg+,** Einstellungen, **F1** Hilfe
+- **Strg+6** Index, **Strg+7** CSL-Editor, **Strg+,** Einstellungen, **F1** Hilfe
 - **Strg+P** Projekt wechseln
 - **Esc** schliesst Menüs, Vorschauen und Dialoge
 - In Eingabefeldern startet **Enter** die Suche bzw. sendet die Frage; **Umschalt+Enter** macht im Fragefeld eine neue Zeile.
@@ -396,6 +396,34 @@ Wie „o. S.“ in Word in den Zotero-Beleg kommt, hängt vom Stil ab; die Einst
 - Setzt der Stil **„S.“** vor die Seite (z. B. APA: „(Müller, 2019, S. 114)“), wäre das „S. o. S.“; dann kommt „, o. S.“ als **Suffix** in den Beleg (in Word im Zotero-Dialog des Belegs sichtbar und änderbar), mit dem Trennzeichen des Stils.
 
 Den Stil später besser in ZotLLM ändern und neu exportieren statt in Word: Die Kennzeichnung ist an den gewählten Stil angepasst. Text und Kennzeichnung („o. S.“) lassen sich unter *Kennzeichnung ohne Seitenzahl* ändern oder leeren.
+
+## CSL-Editor
+
+Zitierstile (CSL) legen fest, wie Belege und Literaturverzeichnis aussehen. Im **CSL-Editor** passen Sie einen bestehenden Stil an – etwa den Ihrer Hochschule – und installieren ihn in Zotero. Die Vorschau rechnet mit **citeproc-js**, derselben Software, mit der Zotero Zitate erzeugt: Was Sie sehen, erscheint auch in Word.
+
+### Stile finden und übernehmen
+
+Links stehen drei Listen: **Eigene** (in ZotLLM bearbeitete Stile), **Zotero** (in Zotero installierte Stile) und **zotero.org** (Suche in den rund 10 000 Stilen des Zotero-Stilverzeichnisses, filterbar nach Format). Die Liste von zotero.org wird erst bei einer Suche geladen (einmalig rund 300 KB) und danach nur abgefragt, wenn sie sich geändert hat. Ausserdem lässt sich eine .csl-Datei importieren.
+
+Fremde Stile sehen Sie zuerst nur in der Vorschau. **Als eigenen Stil übernehmen** legt eine Kopie mit eigenem Namen und eigener Kennung an – das Original bleibt unverändert und wird beim Installieren nicht überschrieben. Bei **abhängigen Stilen** (viele Zeitschriftenstile verweisen nur auf einen Elternstil) entsteht eine eigenständige Kopie des Elternstils.
+
+### Bearbeiten in der Vorschau
+
+Die Vorschau zeigt Belege im Text (mit Seitenangabe) und Einträge im Literaturverzeichnis für typische Dokumenttypen: Buch, Sammelbandbeitrag, Zeitschriftenartikel, Artikel mit vier Autor:innen, Zeitungsartikel, Webseite, Hochschulschrift, Bericht und herausgegebenes Buch. Eigene Einträge aus Zotero kommen unten über die Suche dazu. Die Sprache der Vorschau (Begriffe wie „S.“ oder „Hrsg.“) ist wählbar.
+
+**Klicken Sie auf einen Teil eines Belegs**, etwa auf die Jahreszahl: Rechts erscheinen genau die Eigenschaften dieses Bausteins – Text davor und danach, kursiv, fett, Kapitälchen, Gross-/Kleinschreibung; bei Namen „und“ oder „&“, Reihenfolge, Initialen und ab wie vielen Namen „et al.“ steht; bei Daten die Form; bei Seitenangaben „S.“ oder „Seite“. Die Leiste oben im Panel zeigt, wo der Baustein liegt; ein Klick darauf wählt die umgebende Gruppe. Teile lassen sich verschieben, entfernen oder um ein Feld ergänzen.
+
+Viele Stile verwenden Bausteine (Makros) an mehreren Stellen. Liegt der gewählte Teil in einem solchen Baustein, sagt das Panel, an wie vielen Stellen er wirkt. Nach jeder Änderung sind die betroffenen Beispiele markiert („Die letzte Änderung betrifft 5 von 9 Beispielen“). Ohne Auswahl zeigt das Panel Einstellungen für den ganzen Stil, z. B. „et al.“ in Belegen und Verzeichnis, hängender Einzug oder Seitenbereiche.
+
+### Code und frühere Fassungen
+
+Unter **Code** steht der Stil als XML. Änderungen erscheinen sofort in der Vorschau; Fehler werden mit Zeile und Spalte gemeldet. **Zur Auswahl springen** markiert den in der Vorschau gewählten Baustein im Code. Was die Klick-Bearbeitung nicht abdeckt (z. B. Sortierung, Disambiguierung, neue Bedingungen je Dokumenttyp), lässt sich hier bearbeiten.
+
+**Rückgängig** und **Wiederholen** (Strg+Z) gelten für alle Änderungen. **Speichern** (Strg+S) legt die bisherige Fassung unter **Frühere Fassungen** ab (die letzten 30).
+
+### In Zotero installieren
+
+**In Zotero installieren** übergibt den gespeicherten Stil dem ZotLLM-Plugin, das ihn mit der Zotero-eigenen Funktion installiert. Der Stil steht danach sofort in Zotero, im Word-Plugin und in ZotLLM (**Einstellungen → Zotero und Export**) zur Wahl. Installieren Sie einen geänderten Stil erneut, ersetzt er die frühere Fassung in Zotero. Ohne aktuelles Plugin speichert ZotLLM den Stil als .csl-Datei; in Zotero dann **Einstellungen → Zitieren → „+“** wählen und die Datei öffnen.
 
 ## Einstellungen
 

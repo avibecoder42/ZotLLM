@@ -65,6 +65,7 @@ ZotLLM = {
     }
     this.menuIDs = [];
     delete Zotero.Server.Endpoints["/zotllm/uris"];
+    delete Zotero.Server.Endpoints["/zotllm/styles/install"];
     for (let win of this.windows) this.removeFromWindow(win);
   },
 
@@ -99,6 +100,41 @@ ZotLLM = {
       },
     };
     Zotero.Server.Endpoints["/zotllm/uris"] = Endpoint;
+
+    // Eigenen Stil aus dem CSL-Editor installieren – mit der Funktion, die auch „+“ in den Zotero-Einstellungen nutzt;
+    // danach ist er sofort in Zotero und im Word-Plugin verfügbar. Nur Stile mit ZotLLM-Kennung, damit kein
+    // installierter Originalstil (z. B. APA) überschrieben werden kann. Anfrage: {"style": "<?xml …"}
+    let StyleInstall = function () {};
+    StyleInstall.prototype = {
+      supportedMethods: ["POST"],
+      supportedDataTypes: ["application/json"],
+      permitBookmarklet: false,
+      async init(request) {
+        if (!plugin.fromZotLLM(request)) return [403, "text/plain", "X-ZotLLM header required"];
+        let style = String(((request && request.data) || {}).style || "");
+        let id = (style.match(/<id>\s*([^<]+?)\s*<\/id>/) || [])[1] || "";
+        if (!id.startsWith("http://www.zotero.org/styles/zotllm-")) {
+          return [400, "application/json", JSON.stringify({ error: "Nur eigene Stile aus ZotLLM" })];
+        }
+        try {
+          await Zotero.Styles.install({ string: style }, "ZotLLM", true);
+          return [200, "application/json", JSON.stringify({ installed: id })];
+        } catch (e) {
+          plugin.log("Stil installieren: " + e);
+          return [500, "application/json", JSON.stringify({ error: String(e) })];
+        }
+      },
+    };
+    Zotero.Server.Endpoints["/zotllm/styles/install"] = StyleInstall;
+  },
+
+  // Anfragen von ZotLLM tragen den Kopf X-ZotLLM (Webseiten können ihn ohne CORS-Freigabe nicht setzen)
+  fromZotLLM(request) {
+    let headers = (request && request.headers) || {};
+    let value = typeof headers.get === "function"
+      ? headers.get("X-ZotLLM")
+      : headers["X-ZotLLM"] || headers["x-zotllm"];
+    return value === "1";
   },
 
   // -- Dienst ------------------------------------------------------------------------

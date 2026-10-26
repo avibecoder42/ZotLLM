@@ -70,6 +70,8 @@ class FakeZotero:
         self.authorized = True
         self.remember = True  # „Entscheidung merken“ im Zotero-Dialog
         self.plugin = True  # ZotLLM-Plugin installiert (Schnittstelle /zotllm/uris)
+        self.plugin_version = (0, 10)  # ab 0.10: Stile installieren (/zotllm/styles/install)
+        self.installed_styles: dict[str, str] = {}
         self.writes: list[dict] = []
         self.json_item_requests = 0  # Anfragen mit vollem JSON (lösen in Zotero MD5-Berechnungen aus)
         self._next = 0
@@ -179,6 +181,18 @@ class FakeZotero:
             refs = json.loads(request.content or b"{}").get("items", [])
             return self._resp(200, {"uris": {r: f"http://zotero.org/users/local/abcd1234/items/{r.split(':')[1]}"
                                              for r in refs}})
+        if path == "/zotllm/styles/install":
+            # Plugin ab 0.10.0: eigenen Stil installieren (nur mit X-ZotLLM und ZotLLM-Kennung, wie im Plugin)
+            if not self.plugin or self.plugin_version < (0, 10):
+                return self._resp(404, text="No endpoint found")
+            if request.headers.get("X-ZotLLM") != "1":
+                return self._resp(403, text="X-ZotLLM header required")
+            style = json.loads(request.content or b"{}").get("style", "")
+            m = re.search(r"<id>\s*([^<]+?)\s*</id>", style)
+            if not m or not m.group(1).startswith("http://www.zotero.org/styles/zotllm-"):
+                return self._resp(400, {"error": "Nur eigene Stile aus ZotLLM"})
+            self.installed_styles[m.group(1)] = style
+            return self._resp(200, {"installed": m.group(1)})
         if path == "/api/local/authorize":
             if not json.loads(request.content or b"{}").get("appName"):
                 return self._resp(400, text="appName is required")
