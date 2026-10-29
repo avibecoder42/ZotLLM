@@ -1890,6 +1890,18 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
         return job_or_409("review", "Forschungsstand: Abschnitt neu schreiben",
                           lambda job: reviews.rewrite_section(job, rid, index), group="review")
 
+    @app.post("/api/reviews/{rid}/shorten")
+    def review_shorten(rid: int, body: dict = Body(default={})):
+        """Zu lange Abschnitte kürzen: {"sections": [i, …]} oder ohne Angabe alle, die über dem Plan liegen."""
+        r = _review(rid)
+        indexes = body.get("sections")
+        if indexes is not None and (not isinstance(indexes, list) or not all(isinstance(i, int) for i in indexes)):
+            raise HTTPException(400, "Ungültige Abschnitte")
+        if not (indexes or reviews.long_sections(r.get("state") or {})):
+            raise HTTPException(400, "Kein Abschnitt ist länger als geplant.")
+        return job_or_409("review", "Forschungsstand: Abschnitte kürzen",
+                          lambda job: reviews.shorten(job, rid, indexes), group="review")
+
     @app.post("/api/reviews/{rid}/check")
     def review_check(rid: int):
         return reviews.check(rid)

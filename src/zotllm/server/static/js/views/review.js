@@ -109,6 +109,30 @@ async function rewriteSection(r, i) {
   startJob(`/api/reviews/${r.id}/sections/${i}/rewrite`, t('Abschnitt neu geschrieben'));
 }
 
+// Zu lange Abschnitte auf die geplante Länge kürzen lassen (einer oder alle)
+async function shortenSections(r, list) {
+  const one = list.length === 1;
+  const text = one
+    ? t('„{h}“ wird vom Sprachmodell auf etwa {n} Wörter gekürzt. Belege und wörtliche Zitate bleiben; Neues kommt nicht dazu. Die bisherige Fassung wird ersetzt.', { h: list[0].heading, n: fmtInt(list[0].planned) })
+    : t('{n} Abschnitte werden vom Sprachmodell auf ihre geplante Länge gekürzt. Belege und wörtliche Zitate bleiben; Neues kommt nicht dazu. Die bisherigen Fassungen werden ersetzt.', { n: list.length });
+  if (!await confirmDialog(one ? t('Abschnitt kürzen?') : t('Abschnitte kürzen?'), text, { ok: t('Kürzen') })) return;
+  startJob(`/api/reviews/${r.id}/shorten`, t('Gekürzt'), { body: { sections: list.map(x => x.index) } });
+}
+
+// Abschnitte, die mehr als 20 % über ihrer geplanten Länge liegen, mit „Kürzen“ je Abschnitt bzw. für alle
+function longCard(r, job) {
+  const list = (r.state.check && r.state.check.long_sections) || [];
+  if (!list.length) return null;
+  const busy = { disabled: !!job, why: t('Es läuft bereits ein Auftrag.') };
+  return card(t('Zu lange Abschnitte'), 'alert', h('div', { class: 'stack-sm' },
+    list.map(x => h('div', { key: x.index, class: 'row incomplete-sec' },
+      h('div', { class: 'grow' }, h('b', null, x.heading), h('div', { class: 'muted small' },
+        t('{a} statt etwa {b} Wörter (+{p} %)', { a: fmtInt(x.words), b: fmtInt(x.planned), p: Math.round(100 * (x.words / x.planned - 1)) }))),
+      btn(t('Kürzen'), { size: 'sm', icon: 'scissors', ...busy, onClick: () => shortenSections(r, [x]) }))),
+    h('p', { class: 'muted small' }, t('„Kürzen“ lässt das Sprachmodell den Abschnitt auf die Länge aus der Gliederung straffen – ohne die Auswertungsblätter, also ohne neue Inhalte. Danach den Abschnitt lesen.'))),
+  { class: 'card-warning', actions: list.length > 1 ? btn(t('Alle kürzen'), { size: 'sm', icon: 'scissors', ...busy, onClick: () => shortenSections(r, list) }) : null });
+}
+
 // Abschnitte, die abgebrochen bzw. unvollständig sind (aus der Prüfung), mit „Neu schreiben“ je Abschnitt
 function incompleteCard(r, job) {
   const list = (r.state.check && r.state.check.incomplete_sections) || [];
@@ -195,7 +219,7 @@ function newReviewForm() {
       h('div', { class: 'grid-2' },
         field(t('Titel (optional)'), textInput({ value: f.title, placeholder: t('sonst schlägt ZotLLM einen kurzen Titel vor'), onInput: v => { f.title = v; } })),
         field(t('Sprache des Textes'), select({ value: f.language, options: OUTPUT_LANGUAGES.map(c => ({ value: c, label: languageName(c) })), onChange: v => { f.language = v; update(); } })),
-        field(t('Ziel-Länge (Wörter)'), numberInput({ value: f.words, min: 300, max: 40000, step: 500, int: true, onChange: v => { f.words = v; update(); } }))),
+        field(t('Ziel-Länge (Wörter)'), numberInput({ value: f.words, min: 300, max: 40000, step: 500, int: true, onChange: v => { f.words = v; update(); } }), { help: t('Länge des Textes mit Überschriften und Belegen – Literaturverzeichnis und Anhang „Methode der Literatursuche“ kommen dazu.') })),
       h('div', { class: 'row end' },
         btn(t('Anlegen und Suchstrategie vorschlagen'), { kind: 'primary', icon: 'search', disabled: !!runningJob('review') || !options.length,
           why: options.length ? t('Es läuft bereits ein Auftrag.') : t('Zuerst einen Korpus anlegen.'), onClick: create }))));
@@ -428,8 +452,8 @@ function sheetView(r, d, job) {
         btn(t('Blatt neu erstellen'), { size: 'sm', icon: 'refresh', disabled: !!job, why: t('Es läuft bereits ein Auftrag.'), onClick: rebuild }))));
 }
 
-function stat(label, value) {
-  return h('div', { class: 'stat' }, h('div', { class: 'stat-value' }, value), h('div', { class: 'stat-label' }, label));
+function stat(label, value, title) {
+  return h('div', { class: 'stat', title }, h('div', { class: 'stat-value' }, value), h('div', { class: 'stat-label' }, label));
 }
 
 function outlineEditor(r) {
@@ -440,6 +464,8 @@ function outlineEditor(r) {
   const dirty = () => { s.outlineDirty = true; update(); };
   const move = (i, d) => { const [x] = o.sections.splice(i, 1); o.sections.splice(i + d, 0, x); dirty(); };
   const total = o.sections.reduce((a, x) => a + (Number(x.words) || 0), 0);
+  // Geschriebene Wörter je Abschnitt (nur solange die Gliederung nicht umgestellt ist)
+  const written = s.outlineDirty ? [] : (r.state.sections || []).map(x => (x.text || '').split(/\s+/).filter(Boolean).length);
   return h('div', { class: 'stack' },
     field(t('Titel'), textInput({ value: o.title || '', onInput: v => { o.title = v; s.outlineDirty = true; }, onChange: () => update() })),
     h('div', { class: 'outline' }, o.sections.map((sec, i) => h('div', { key: i, class: 'outline-sec' },
@@ -448,7 +474,8 @@ function outlineEditor(r) {
         textInput({ value: sec.heading, class: 'outline-heading', label: t('Überschrift'), onInput: v => { sec.heading = v; s.outlineDirty = true; }, onChange: () => update() }),
         textArea({ value: sec.focus || '', rows: 2, label: t('Fokus'), onInput: v => { sec.focus = v; s.outlineDirty = true; }, onChange: () => update() }),
         h('div', { class: 'row wrap' },
-          h('div', { class: 'outline-words' }, numberInput({ value: sec.words, min: 50, max: 20000, step: 100, int: true, onChange: v => { sec.words = v; dirty(); } }), h('span', { class: 'muted small' }, t('Wörter'))),
+          h('div', { class: 'outline-words' }, numberInput({ value: sec.words, min: 50, max: 20000, step: 100, int: true, onChange: v => { sec.words = v; dirty(); } }), h('span', { class: 'muted small' }, t('Wörter')),
+            written[i] != null && h('span', { class: ['small', written[i] > 1.2 * (Number(sec.words) || 0) ? 'text-warn' : 'muted'] }, t('· geschrieben: {n}', { n: fmtInt(written[i]) }))),
           (sec.keys || []).map(k => h('span', { key: k, class: 'chip', title: docs[k] ? docs[k].title : t('unbekannter Text') }, h('span', null, docs[k] ? docs[k].citation : k),
             h('button', { class: 'chip-x', title: t('Entfernen'), onclick: () => { sec.keys = sec.keys.filter(x => x !== k); dirty(); } }, icon('x', 11)))))),
       h('div', { class: 'outline-tools' },
@@ -511,9 +538,11 @@ function reviewText(r) {
 function checkWarnings(r, c, job) {
   const docs = Object.fromEntries((r.docs || []).map(d => [d.item_key, d]));
   const incomplete = c.incomplete_sections || [];
+  const long = c.long_sections || [];
   const removed = c.removed_docs || [];
   const parts = [
     incomplete.length && plural(incomplete.length, t('unvollständiger Abschnitt'), t('unvollständige Abschnitte')),
+    long.length && plural(long.length, t('zu langer Abschnitt'), t('zu lange Abschnitte')),
     c.unverified_quotes.length && plural(c.unverified_quotes.length, t('unklares Zitat'), t('unklare Zitate')),
     c.unknown_keys.length && plural(c.unknown_keys.length, t('unbekannter Beleg'), t('unbekannte Belege')),
     removed.length && plural(removed.length, t('Beleg auf gelöschten Text'), t('Belege auf gelöschte Texte')),
@@ -522,6 +551,7 @@ function checkWarnings(r, c, job) {
   if (!parts.length) return null;
   const body = () => h('div', { class: 'stack' },
     incompleteCard(r, job),
+    longCard(r, job),
     c.unknown_keys.length ? notice('error', t('Belege auf Texte, die nicht zur Auswahl gehören: {keys}. Diese Stellen bitte prüfen.', { keys: c.unknown_keys.join(', ') })) : null,
     removed.length ? notice('warning', t('Belege auf Texte, die in Zotero gelöscht wurden und keine andere Kopie haben: {list}. Die Belege bleiben lesbar, verweisen aber auf keinen Eintrag mehr – Text in Zotero wiederherstellen oder die Stellen anpassen.',
       { list: removed.map(d => d.title ? `${d.citation} („${d.title}“)` : d.citation).join('; ') })) : null,
@@ -544,10 +574,12 @@ function step5(r, job) {
     btn(t('Kopieren'), { icon: 'copy', onClick: () => copyTarget({ kind: 'review', id: r.id }) }),
     btn(t('Exportieren …'), { kind: 'primary', icon: 'download', onClick: e => exportMenu(e, { kind: 'review', id: r.id }, name) }),
   ];
-  const clean = c && !c.unverified_quotes.length && !c.unknown_keys.length && !(c.incomplete_sections || []).length && !(c.removed_docs || []).length;
+  const clean = c && !c.unverified_quotes.length && !c.unknown_keys.length && !(c.incomplete_sections || []).length && !(c.removed_docs || []).length && !(c.long_sections || []).length;
   const body = h('div', { class: 'stack' },
     c ? h('div', { class: 'stats-row' },
-      stat(t('Wörter'), fmtInt(c.words)), stat(t('zitierte Texte'), t('{a} von {b}', { a: c.cited_docs, b: c.cited_docs + c.uncited_docs.length })),
+      stat(c.planned_words ? t('Wörter (geplant: {n})', { n: fmtInt(c.planned_words) }) : t('Wörter'), fmtInt(c.words),
+        t('Text mit Überschriften und Belegen – ohne Literaturverzeichnis und Anhang „Methode der Literatursuche“')),
+      stat(t('zitierte Texte'), t('{a} von {b}', { a: c.cited_docs, b: c.cited_docs + c.uncited_docs.length })),
       stat(t('Zitate geprüft'), fmtInt(c.verified_quotes)),
       stat(t('Zitate unklar'), fmtInt(c.unverified_quotes.length)), stat(t('unbekannte Belege'), fmtInt(c.unknown_keys.length)))
       : h('p', { class: 'muted' }, t('Noch nicht geprüft.')),

@@ -795,6 +795,7 @@ details.doc-group > summary:hover .doc-group-title { color: var(--accent); }
 .outline-heading { font-weight: 620; }
 .outline-words { display: flex; align-items: center; gap: 6px; }
 .outline-words .number { width: 130px; }
+.text-warn { color: var(--warn); }
 .outline-tools { display: flex; flex-direction: column; gap: 2px; }
 .quote-check { margin: 0; padding: 8px 12px; border-left: 3px solid var(--warn); background: var(--warn-soft); border-radius: 0 8px 8px 0; font-family: var(--serif); }
 

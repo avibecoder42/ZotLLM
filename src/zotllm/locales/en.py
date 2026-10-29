@@ -162,6 +162,12 @@ MESSAGES: dict[str, str] = {
     "Diesen Abschnitt gibt es nicht (mehr) – bitte den ganzen Text neu schreiben.":
         "This section no longer exists – please rewrite the whole text.",
     "Abschnitt nicht gefunden": "Section not found",
+    "Kürzen": "Shortening",
+    "Gekürzt: {a} → {b} Wörter": "Shortened: {a} → {b} words",
+    "Gekürzt: {a} → {b} Wörter; unverändert: {list}": "Shortened: {a} → {b} words; unchanged: {list}",
+    "Kein Abschnitt ist länger als geplant.": "No section is longer than planned.",
+    "Ungültige Abschnitte": "Invalid sections",
+    "Forschungsstand: Abschnitte kürzen": "Literature review: shorten sections",
     "Suchanfragen konnten nicht erzeugt werden: {e}": "Search queries could not be generated: {e}",
     "Vorauswahl-Fehler: {e}": "Pre-selection error: {e}",
     "Notizen nicht gespeichert: Schreibzugriff auf Zotero nicht freigegeben.":

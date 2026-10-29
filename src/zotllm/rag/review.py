@@ -117,7 +117,41 @@ Gliederung des Gesamttextes:
 Bisher geschriebene Abschnitte:
 {previous}
 
-Schreibe jetzt den Abschnitt „{heading}“ (Fokus: {focus}) mit etwa {words} Wörtern. Stütze dich vor allem auf: {keys}."""
+Schreibe jetzt den Abschnitt „{heading}“ (Fokus: {focus}). Stütze dich vor allem auf: {keys}.
+Umfang: {low}–{words} Wörter, Überschrift und Belege eingerechnet.{budget} Die Obergrenze ist verbindlich: Schreibe knapp und dicht, fasse ähnliche Befunde zusammen, statt jeden einzeln nachzuerzählen."""
+
+SHORTEN_SYSTEM = """Du kürzt einen Abschnitt eines wissenschaftlichen Forschungsstands auf eine vorgegebene Länge.
+
+Regeln:
+- Nichts Neues hinzufügen: nur straffen, zusammenfassen und Nebensächliches streichen.
+- Belege [@SCHLÜSSEL] bzw. [@SCHLÜSSEL, S. 12] unverändert übernehmen; jede verbleibende Aussage behält ihren Beleg.
+- Wörtliche Zitate entweder exakt übernehmen oder ganz streichen – nie verändern.
+- Überschrift (##), Sprache, Stil und Markdown beibehalten. Kein LaTeX.
+- Antworte nur mit dem gekürzten Abschnitt."""
+
+SHORTEN_PROMPT = """Kürze diesen Abschnitt von {words} auf höchstens {limit} Wörter (Überschrift und Belege eingerechnet). Behalte die zentralen Befunde, Vergleiche und Widersprüche; streiche Wiederholungen, Einzelheiten und Überleitungen.
+
+{text}"""
+
+LONG_FACTOR = 1.2  # ab 20 % über dem Plan gilt ein Abschnitt als zu lang
+
+
+def count_words(text: str) -> int:
+    """Wörter wie in der Anzeige: Überschrift und Belege zählen mit, Literaturverzeichnis und Anhang nicht."""
+    return len((text or "").split())
+
+
+def section_budget(planned: list, index: int, written_before: list[int]) -> int:
+    """Wortgrenze für Abschnitt `index`: geplant, abzüglich seines Anteils daran, wie weit die bisherigen Abschnitte
+    über ihrem Plan liegen – so gleichen die späteren aus (höchstens bis auf 60 % des Plans; kürzere gleichen nicht
+    nach oben aus)."""
+    plan = [int(p or 500) for p in planned]
+    words = plan[index]
+    over = sum(written_before) - sum(plan[:len(written_before)])
+    rest = sum(plan[index:])
+    if over > 0 and rest:
+        words = max(round(0.6 * words), round(words - over * words / rest))
+    return words
 
 
 def unclosed_quote(text: str) -> bool:
@@ -403,9 +437,10 @@ class ReviewService:
             d["has_sheet"] = self.store.get_sheet(d["lib"], d["item_key"]) is not None
             d["zotero_select"] = zotero_select_url(d["lib"], d["item_key"])
         review["docs"] = docs
-        # Prüfung aus einer älteren Version (ohne unvollständige Abschnitte oder gelöschte Texte): gleich auffrischen
+        # Prüfung aus einer älteren Version (ohne unvollständige oder zu lange Abschnitte, gelöschte Texte): auffrischen
         check = review["state"].get("check")
-        if check and ("incomplete_sections" not in check or "removed_docs" not in check) and review["state"].get("sections"):
+        if check and any(k not in check for k in ("incomplete_sections", "removed_docs", "long_sections")) \
+                and review["state"].get("sections"):
             try:
                 review["state"]["check"] = self.check(review_id)
             except Exception as e:  # noqa: BLE001 - die Anzeige darf daran nicht scheitern
@@ -1171,13 +1206,20 @@ class ReviewService:
         Wiedergabe), wird er einmal neu geschrieben: mit mehr Platz bzw. der Vorgabe, kürzer wörtlich zu zitieren.
         Bleibt er abgeschnitten, ist das am Abschnitt vermerkt („stopped“) und die Prüfung meldet ihn."""
         llm_cfg = self.engine.settings.llm
+        planned = [s.get("words") for s in state["outline"]["sections"]]
+        index = len(before)
+        written = [count_words(s["text"]) for s in before]
+        words = section_budget(planned, index, written) if index < len(planned) else int(sec.get("words") or 500)
+        budget = ""
+        if written:
+            budget = (f" Die bisherigen Abschnitte haben {sum(written)} Wörter; für den ganzen Text sind etwa "
+                      f"{sum(int(p or 500) for p in planned)} vorgesehen.")
         prompt = WRITE_PROMPT.format(
             question=review["question"], language=self._language(state), outline=outline_text,
             previous="\n\n".join(s["text"] for s in before) or "(noch keine)", heading=sec.get("heading", ""),
-            focus=sec.get("focus", ""), words=sec.get("words", 500),
+            focus=sec.get("focus", ""), words=words, low=round(0.8 * words), budget=budget,
             keys=", ".join(sec.get("keys", [])) or "alle passenden",
         )
-        words = int(sec.get("words", 500) or 500)
         params = GenParams(max_tokens=max(4000, min(llm_cfg.max_output_tokens, words * 4 + 4000)),
                            temperature=llm_cfg.temperature, effort=effort)
         c = model.complete(system, [ChatMessage("user", prompt)], params)
@@ -1247,6 +1289,67 @@ class ReviewService:
         self._finish_writing(job, review_id, state, meta, len(sections[index]["text"].split()))
         return {"section": index}
 
+    def long_sections(self, state: dict) -> list[dict]:
+        """Abschnitte, die mehr als 20 % über ihrer geplanten Länge liegen."""
+        planned = [s.get("words") for s in (state.get("outline") or {}).get("sections", [])]
+        out = []
+        for i, sec in enumerate(state.get("sections") or []):
+            plan = int(planned[i] or 0) if i < len(planned) else 0
+            words = count_words(sec.get("text", ""))
+            if plan and words > LONG_FACTOR * plan:
+                out.append({"index": i, "heading": sec.get("heading", ""), "words": words, "planned": plan})
+        return out
+
+    def shorten(self, job: Job, review_id: int, indexes: list[int] | None = None) -> dict:
+        """Zu lange Abschnitte auf ihre geplante Länge kürzen lassen (ohne Auswertungsblätter: nur straffen, Belege und
+        Zitate bleiben). Ohne `indexes` alle zu langen. Bricht die Ausgabe ab oder wird sie nicht kürzer, bleibt der
+        Abschnitt, wie er war."""
+        review, state, meta, model, effort, _system, _outline = self._write_context(review_id, job)
+        sections = list(state.get("sections") or [])
+        planned = [s.get("words") for s in state["outline"]["sections"]]
+        todo = [x["index"] for x in self.long_sections(state)] if indexes is None else indexes
+        todo = [i for i in todo if 0 <= i < min(len(sections), len(planned)) and planned[i]]
+        if not todo:
+            raise ValueError("Kein Abschnitt ist länger als geplant.")
+        llm_cfg = self.engine.settings.llm
+        job.update(phase="Kürzen", total=len(todo), done=0)
+        before_words = sum(count_words(sections[i]["text"]) for i in todo)
+        kept = []
+        for i in todo:
+            job.check()
+            sec, limit = sections[i], int(planned[i])
+            job.update(message=f"Abschnitt: {sec.get('heading', '')}")
+            old = sec["text"]
+            params = GenParams(max_tokens=max(4000, min(llm_cfg.max_output_tokens, limit * 4 + 4000)),
+                               temperature=llm_cfg.temperature, effort=effort)
+            prompt = SHORTEN_PROMPT.format(words=count_words(old), limit=limit, text=old)
+            c = model.complete(SHORTEN_SYSTEM, [ChatMessage("user", prompt)], params)
+            stopped = truncation(c.stop_reason)
+            if stopped:
+                cap = max(llm_cfg.max_output_tokens, params.max_tokens * 2)
+                params2, prompt2 = retry_after_truncation(stopped, params, prompt, cap)
+                c = model.complete(SHORTEN_SYSTEM, [ChatMessage("user", prompt2)], params2)
+                stopped = truncation(c.stop_reason)
+            text = c.text.strip()
+            first = old.lstrip().splitlines()[0] if old.strip() else ""
+            if text and first.startswith("#") and not text.startswith("#"):
+                text = f"{first}\n\n{text}"  # Überschrift weggelassen: wieder davor
+            if stopped or not text or count_words(text) >= count_words(old):
+                kept.append(sec.get("heading", ""))
+            else:
+                sections[i] = {"heading": sec.get("heading", ""), "text": text}
+                state["sections"] = sections
+                self.store.update_review_state(review_id, state)
+            job.step()
+        state["sections"] = sections
+        after_words = sum(count_words(sections[i]["text"]) for i in todo)
+        check = self._finish_writing(job, review_id, state, meta, after_words)
+        msg = f"Gekürzt: {before_words} → {after_words} Wörter"
+        if kept:
+            msg += f"; unverändert: {', '.join(kept)}"
+        job.update(phase="Fertig", message=msg)
+        return {"sections": len(todo) - len(kept), "kept": kept, "check": check}
+
     # ------------------------------------------------------------------------------
     # Schritt 4: Kontrolle & Ausgabe
     # ------------------------------------------------------------------------------
@@ -1304,7 +1407,9 @@ class ReviewService:
                     "title": (cited_items.get((docs[k]["lib"], k)) or {}).get("title", "")}
                    for k in sorted(used) if (cited_items.get((docs[k]["lib"], k)) or {"removed": True}).get("removed")]
         result = {
-            "words": len(text.split()),
+            "words": count_words(text),
+            "planned_words": sum(int(p or 0) for p in planned),
+            "long_sections": self.long_sections(state),
             "cited_docs": len(used),
             "uncited_docs": [{"key": k, "lib": docs[k]["lib"]} for k in docs if k not in used],
             "unknown_keys": unknown,

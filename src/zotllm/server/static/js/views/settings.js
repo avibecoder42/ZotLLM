@@ -517,7 +517,7 @@ const ADVANCED = () => [
     ['review.relevant_chunks_if_long', t('Abschnitte bei langen Texten'), 'int', { min: 5, max: 500 }],
     ['review.sheet_model', t('Modell für Auswertungsblätter'), 'select', { options: [['main', t('Hauptmodell')], ['helper', t('Hilfsmodell')]] }],
     ['review.screening_model', t('Modell für die Vorauswahl'), 'select', { options: [['helper', t('Hilfsmodell')], ['main', t('Hauptmodell')]] }],
-    ['review.target_words', t('Standard-Länge (Wörter)'), 'int', { min: 300, max: 40000, step: 500 }],
+    ['review.target_words', t('Standard-Länge (Wörter)'), 'int', { min: 300, max: 40000, step: 500, help: t('Länge des Textes mit Überschriften und Belegen – Literaturverzeichnis und Anhang „Methode der Literatursuche“ kommen dazu.') }],
     ['review.parallel_requests', t('Parallele Anfragen'), 'int', { min: 1, max: 16 }],
   ] },
   { id: 'chunking', title: t('Zerlegung in Abschnitte'), icon: 'layers', note: t('Wirkt auf neu indexierte Texte. Für den ganzen Bestand müssten die Texte neu eingelesen werden.'), fields: [

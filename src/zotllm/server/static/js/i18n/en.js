@@ -1786,4 +1786,27 @@ export default {
   'Erste Version: Der CSL-Editor ist noch in Entwicklung. Hinweise und Beiträge sind willkommen!':
     'First version: the CSL editor is still in development. Feedback and contributions are welcome!',
   'Auf GitHub melden': 'Report on GitHub',
+  'Datei': 'File',
+  // 1.0.1: Länge des Forschungsstands
+  '„{h}“ wird vom Sprachmodell auf etwa {n} Wörter gekürzt. Belege und wörtliche Zitate bleiben; Neues kommt nicht dazu. Die bisherige Fassung wird ersetzt.':
+    'The language model shortens “{h}” to about {n} words. Citations and verbatim quotations stay; nothing new is added. The current version is replaced.',
+  '{n} Abschnitte werden vom Sprachmodell auf ihre geplante Länge gekürzt. Belege und wörtliche Zitate bleiben; Neues kommt nicht dazu. Die bisherigen Fassungen werden ersetzt.':
+    'The language model shortens {n} sections to their planned length. Citations and verbatim quotations stay; nothing new is added. The current versions are replaced.',
+  'Abschnitt kürzen?': 'Shorten section?',
+  'Abschnitte kürzen?': 'Shorten sections?',
+  'Kürzen': 'Shorten',
+  'Gekürzt': 'Shortened',
+  'Alle kürzen': 'Shorten all',
+  'Zu lange Abschnitte': 'Sections that are too long',
+  'zu langer Abschnitt': 'section too long',
+  'zu lange Abschnitte': 'sections too long',
+  '{a} statt etwa {b} Wörter (+{p} %)': '{a} instead of about {b} words (+{p}%)',
+  '„Kürzen“ lässt das Sprachmodell den Abschnitt auf die Länge aus der Gliederung straffen – ohne die Auswertungsblätter, also ohne neue Inhalte. Danach den Abschnitt lesen.':
+    '“Shorten” has the language model tighten the section to the length from the outline – without the evaluation sheets, so without new content. Read the section afterwards.',
+  'Wörter (geplant: {n})': 'words (planned: {n})',
+  'Text mit Überschriften und Belegen – ohne Literaturverzeichnis und Anhang „Methode der Literatursuche“':
+    'Text with headings and citations – without the bibliography and the “Literature search method” appendix',
+  '· geschrieben: {n}': '· written: {n}',
+  'Länge des Textes mit Überschriften und Belegen – Literaturverzeichnis und Anhang „Methode der Literatursuche“ kommen dazu.':
+    'Length of the text with headings and citations – the bibliography and the “Literature search method” appendix come on top.',
 };

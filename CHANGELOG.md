@@ -2,6 +2,21 @@
 
 All notable changes, newest first.
 
+## 1.0.1 – 2026-10-29
+
+### New
+- "Check" shows the written words against the planned length and lists **sections that are too long** (more than
+  20 % over their plan). **Shorten** has the language model tighten a section to its planned length without adding
+  anything new – citations and verbatim quotations stay unchanged or are dropped; **Shorten all** does this for all of
+  them. The outline shows the words actually written next to each section's word count.
+- The target length is explained: it refers to the text with headings and citations; the bibliography and the
+  "Literature search method" appendix come on top (Word's word count includes them).
+
+### Fixed
+- **Length of literature reviews:** language models wrote much more than planned (e.g. about 2,400 instead of 1,600
+  words). Each section's word count from the outline is now a binding upper limit in the writing prompt; if a
+  section runs long, the following ones get correspondingly less room (down to at most 60 % of their plan).
+
 ## 1.0.0 – 2026-10-29
 
 ### New
