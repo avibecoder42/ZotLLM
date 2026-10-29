@@ -168,7 +168,7 @@ def test_api_create_edit_install(client, fake_zotero):
     assert 'prefix="["' in r["xml"] and len(r["versions"]) == 1
     bad = client.put(f"/api/csl/styles/{slug}", json={"xml": "<style"}, headers=H)
     assert bad.status_code == 400
-    # In Zotero installieren (Plugin ab 0.10.0)
+    # In Zotero installieren (Plugin ab 1.0.0)
     assert client.post(f"/api/csl/styles/{slug}/install", headers=H).json()["installed"]
     assert list(fake_zotero.installed_styles) == [csl.ID_PREFIX + slug]
     fake_zotero.plugin_version = (0, 9)
@@ -182,3 +182,77 @@ def test_api_items_for_preview(client, fake_zotero):
     fake_zotero.add_item("ITEMC001", "Ein Buch über Beispiele", "Muster", "2022")
     items =client.post("/api/csl/items", json={"items": ["users/0:ITEMC001"]}, headers=H).json()["items"]
     assert items and items[0]["id"] == "users/0:ITEMC001" and items[0]["title"] == "Ein Buch über Beispiele"
+
+
+def test_item_types_from_zotero_schema(client, fake_zotero, monkeypatch):
+    """Weitere Eintragsarten: Liste und Namen aus Zotero, Beispiele wie in Zotero nach CSL-JSON umgesetzt."""
+    from zotllm import csl_types
+
+    monkeypatch.setattr(csl_types, "_memory", {"schema": None, "at": 0.0})
+    r = client.get("/api/csl/item-types", params={"lang": "de"}).json()
+    assert r["source"] == "zotero"
+    by_type = {x["type"]: x for x in r["types"]}
+    # Standardbeispiele (Buch) und Notizen fehlen; sortiert nach Namen
+    assert [x["label"] for x in r["types"]] == ["Gerichtsentscheidung", "Hologramm", "Kunstwerk"]
+    case = by_type["case"]["item"]
+    assert case["type"] == "legal_case" and case["title"] == "Brown v. Board of Education" and case["authority"] == "U.S. Supreme Court"
+    assert case["container-title"] == "U.S." and case["volume"] == "347" and case["page"] == "483"
+    assert case["issued"] == {"date-parts": [[1954, 5, 17]]} and case["__locator"] == "495" and case["id"] == "z:case"
+    # Die Hauptrolle der Art wird zu „author“ (wie in Zotero)
+    art = by_type["artwork"]["item"]
+    assert art["type"] == "graphic" and art["author"] == [{"family": "Mendel", "given": "Clara"}] and art["medium"] == "Oil on canvas"
+    # Neue Art ohne eigenes Beispiel: allgemeines aus ihren Feldern
+    holo = by_type["hologram"]["item"]
+    assert holo["title"] == "Example title" and holo["publisher"] == "Example Publisher" and holo["author"][0]["family"] == "Doe"
+    assert holo["type"] == "document"
+    assert client.get("/api/csl/item-types", params={"lang": "en"}).json()["types"][0]["label"] == "Artwork"
+    # Ohne Zotero: zuletzt gespeichertes Schema
+    monkeypatch.setattr(csl_types, "_memory", {"schema": None, "at": 0.0})
+    monkeypatch.setattr(fake_zotero, "schema", {"broken": True})
+    r = client.get("/api/csl/item-types").json()
+    assert r["source"] == "cache" and len(r["types"]) == 3
+
+
+
+def test_library_examples_pick_matching_items(client, zengine):
+    """Beispiele aus der eigenen Bibliothek: passende Eintragsart und Personen, sonst kein Treffer (→ erfundenes)."""
+    def item(key, itype, authors=0, editors=0, year="2020", **extra):
+        creators = [{"creatorType": "author", "lastName": f"A{i}", "firstName": "X"} for i in range(authors)]
+        creators += [{"creatorType": "editor", "lastName": f"E{i}", "firstName": "Y"} for i in range(editors)]
+        return {"key": key, "version": 1, "data": {"key": key, "itemType": itype, "title": f"Titel {key}", "creators": creators,
+                                                    "date": year, **extra}, "meta": {"parsedDate": year}}
+
+    zengine.store.upsert_items("users/0", [
+        item("ART4AAAA", "journalArticle", authors=4, publicationTitle="Zeitschrift", DOI="10.1/x"),
+        item("ART2AAAA", "journalArticle", authors=2, publicationTitle="Zeitschrift"),
+        item("ART2BBBB", "journalArticle", authors=2),  # weniger vollständig
+        item("EDITAAAA", "book", editors=2),
+        item("CASEAAAA", "case"),
+    ])
+    r = client.post("/api/csl/library-examples", json={"examples": ["article4", "article", "edited", "book", "z:case", "z:film"]},
+                    headers=H).json()["items"]
+    assert {ex: x["ref"] for ex, x in r.items()} == {"article4": "users/0:ART4AAAA", "article": "users/0:ART2AAAA",
+                                                    "edited": "users/0:EDITAAAA", "z:case": "users/0:CASEAAAA"}
+    assert r["article4"]["item"]["id"] == "lib:article4" and r["article4"]["title"] == "Titel ART4AAAA"
+
+
+def test_collection_examples(client, zengine, monkeypatch):
+    """Eine Sammlung als Beispiele: ihre Einträge samt Untersammlungen, nach Eintragsart sortiert, mit Namen aus Zotero."""
+    from zotllm import csl_types
+
+    monkeypatch.setattr(csl_types, "_memory", {"schema": None, "at": 0.0})
+    store = zengine.store
+    store.replace_collections("users/0", [{"key": "COLAAAAA", "data": {"name": "Testfälle", "parentCollection": False}},
+                                          {"key": "COLBBBBB", "data": {"name": "Bücher", "parentCollection": "COLAAAAA"}}])
+
+    def item(key, itype, cols):
+        return {"key": key, "version": 1, "meta": {"parsedDate": "2020"},
+                "data": {"key": key, "itemType": itype, "title": f"Titel {key}", "date": "2020", "collections": cols,
+                         "creators": [{"creatorType": "author", "lastName": "Muster", "firstName": "A."}]}}
+
+    store.upsert_items("users/0", [item("ITEMXXXX", "journalArticle", ["COLAAAAA"]), item("ITEMYYYY", "book", ["COLBBBBB"]),
+                                   item("ITEMZZZZ", "book", [])])
+    r = client.post("/api/csl/collection-examples", json={"collection": "users/0:COLAAAAA", "lang": "de"}, headers=H).json()
+    assert r["total"] == 2 and [x["ref"] for x in r["items"]] == ["users/0:ITEMYYYY", "users/0:ITEMXXXX"]
+    assert r["items"][0]["label"] == "Buch" and r["items"][0]["item"]["id"] == "c:users/0:ITEMYYYY"
+    assert client.post("/api/csl/collection-examples", json={"collection": "users/0:*"}, headers=H).status_code == 400

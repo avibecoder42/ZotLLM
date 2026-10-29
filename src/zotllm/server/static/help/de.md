@@ -333,27 +333,31 @@ Folgefragen beziehen sich auf den bisherigen Verlauf. Links stehen die bisherige
 
 ## Forschungsstand
 
-Der Forschungsstand führt in vier Schritten zu einem belegten Überblickstext. Jeder Schritt wartet auf Ihre Bestätigung; Sie können jederzeit zu einem früheren Schritt zurück.
+Der Forschungsstand führt in fünf Schritten zu einem belegten Überblickstext. Jeder Schritt wartet auf Ihre Bestätigung; Sie können jederzeit zu einem früheren Schritt zurück. Jeder Schritt ist gleich aufgebaut: Oben stehen die fünf Schritte, darunter links der eingeklappte **Prompt** (Titel, Forschungsfrage, Korpora, Sprache, Ziel-Länge) und rechts die Knöpfe, mit denen es weitergeht – immer an derselben Stelle.
 
-### 1. Texte finden
+### 1. Stichworte
 
-Sie geben eine Forschungsfrage ein, wählen die Korpora des Projekts, die Sprache des Textes und die Ziel-Länge. ZotLLM schlägt eine **Suchstrategie** vor: viele Suchanfragen auf Deutsch und Englisch, mit Synonymen und Fachbegriffen. Sie lassen sich ändern, löschen und ergänzen – wie Suchstrings in Literaturdatenbanken.
+Sie geben eine Forschungsfrage ein, wählen die Korpora des Projekts, die Sprache des Textes und die Ziel-Länge. ZotLLM schlägt eine **Suchstrategie** vor: viele Suchanfragen auf Deutsch und Englisch, mit Synonymen und Fachbegriffen. Sie lassen sich ändern, löschen und ergänzen – wie Suchstrings in Literaturdatenbanken. **Suche starten** sucht mit allen Anfragen und wechselt zum nächsten Schritt. Danach zeigt jede Anfrage, wie viele Texte sie gefunden hat und wie viele nur durch sie; **Suche wiederholen** sucht nach einer Änderung neu (die bisherigen Häkchen gehen dabei verloren).
 
-Nach **Suche starten** zeigt jede Anfrage, wie viele Texte sie gefunden hat und wie viele nur durch sie. Das Hilfsmodell schlägt eine Auswahl vor (vorgeschlagen, vielleicht, ausgeschlossen, jeweils mit Begründung). Sie prüfen die Häkchen. **Als Zotero-Sammlung** legt die Auswahl als Sammlung an; dort ergänzte Einträge holt **Aus Sammlung übernehmen** zurück. **Auswahl bestätigen** schliesst den Schritt ab.
+### 2. Literatur auswählen
 
-### 2. Auswerten
+Das Hilfsmodell schlägt eine Auswahl vor (vorgeschlagen, vielleicht, ausgeschlossen, jeweils mit Begründung). Sie prüfen die Häkchen. **Als Zotero-Sammlung** legt die Auswahl als Sammlung an; dort ergänzte Einträge holt **Aus Sammlung übernehmen** zurück. **Auswahl bestätigen** schliesst den Schritt ab.
+
+### 3. Auswerten
 
 Jeder Text wird einzeln gelesen – bis zu einer einstellbaren Länge ganz, sonst die zur Frage passenden Teile – und in einem **Auswertungsblatt** festgehalten: Fragestellung, Methode, Stichprobe, Befunde, Grenzen und wörtliche Kernzitate mit Seite. Die Seite eines Kernzitats überlässt ZotLLM nicht dem Sprachmodell: Es sucht das Zitat im Text und setzt die gedruckte Seitenzahl (oder „o. S.“). Vorher zeigt ZotLLM die gezählten Input-Token, die geschätzten Output- und Denk-Token und – wenn Preise eingetragen sind – die geschätzten Kosten. Blätter werden wiederverwendet; auf Wunsch speichert ZotLLM sie auch als Notiz am Zotero-Eintrag.
 
-### 3. Schreiben
+Ein Klick auf einen Text mit Häkchen zeigt sein Auswertungsblatt: Kurzbeschreibung, Felder, zentrale Befunde, Kernzitate und Stichworte, dazu Modell, Datum und Grundlage (ganzer Text oder Auszüge). Ein Klick auf die Seite eines Kernzitats öffnet die PDF in Zotero an dieser Stelle. **Blatt neu erstellen** liest nur diesen Text noch einmal und ersetzt das Blatt (und die Notiz in Zotero); ein bereits geschriebener Text bleibt unverändert.
 
-Aus allen Blättern entsteht eine **thematische Gliederung** (nicht Text für Text). Überschriften, Fokus, Wortzahl und zugeordnete Texte lassen sich anpassen, Abschnitte hinzufügen, verschieben und entfernen. Danach werden die Abschnitte nacheinander geschrieben; jede Aussage wird mit dem Text belegt, aus dem sie stammt.
+### 4. Schreiben
+
+Aus allen Blättern entsteht eine **thematische Gliederung** (nicht Text für Text). Überschriften, Fokus, Wortzahl und zugeordnete Texte lassen sich anpassen, Abschnitte hinzufügen, verschieben und entfernen. Danach werden die Abschnitte nacheinander geschrieben; jede Aussage wird mit dem Text belegt, aus dem sie stammt. Ist der Text geschrieben, wechselt ZotLLM zu **Prüfen** und zeigt ihn dort.
 
 Bricht der Anbieter einen Abschnitt vorzeitig ab – beim Längenlimit (bei Gemini zählen die Denk-Token mit) oder weil die Ausgabe eine längere Passage wörtlich wiedergab (eine Sperre von Gemini) –, schreibt ZotLLM ihn sofort ein zweites Mal: mit mehr Platz bzw. mit der Vorgabe, kürzer wörtlich zu zitieren. Einen einzelnen Abschnitt neu schreiben lassen Sie über das Stift-Symbol in der Gliederung; die übrigen Abschnitte bleiben dabei unverändert.
 
-### 4. Prüfen und ausgeben
+### 5. Prüfen und ausgeben
 
-Die Prüfung zählt Wörter und zitierte Texte, sucht jedes wörtliche Zitat im Originaltext und meldet Belege auf Texte ausserhalb der Auswahl. Nicht gefundene Zitate sind oft nur Silbentrennungen oder Auslassungen – trotzdem vor der Verwendung mit der PDF vergleichen.
+Die Prüfung zählt Wörter und zitierte Texte, sucht jedes wörtliche Zitat im Originaltext und meldet Belege auf Texte ausserhalb der Auswahl. Nicht gefundene Zitate sind oft nur Silbentrennungen oder Auslassungen – trotzdem vor der Verwendung mit der PDF vergleichen. Die Hinweise sind unter **Hinweise der Prüfung** eingeklappt; die Zeile nennt, was es zu prüfen gibt, ein Klick zeigt die Einzelheiten. Darunter steht der Text.
 
 Sie meldet ausserdem **unvollständige Abschnitte**: vom Anbieter abgebrochen, mit einem Zitat ohne schliessendes Anführungszeichen, mitten im Satz endend oder zusätzlich deutlich kürzer als geplant. **Neu schreiben** neben dem Abschnitt ersetzt nur diesen. **Erneut prüfen** wiederholt die Prüfung ohne Sprachmodell, etwa nach einer Änderung am Text.
 
@@ -401,6 +405,8 @@ Den Stil später besser in ZotLLM ändern und neu exportieren statt in Word: Die
 
 Zitierstile (CSL) legen fest, wie Belege und Literaturverzeichnis aussehen. Im **CSL-Editor** passen Sie einen bestehenden Stil an – etwa den Ihrer Hochschule – und installieren ihn in Zotero. Die Vorschau rechnet mit **citeproc-js**, derselben Software, mit der Zotero Zitate erzeugt: Was Sie sehen, erscheint auch in Word.
 
+> **Erste Version:** Der CSL-Editor befindet sich noch in Entwicklung. Hinweise, Fehlermeldungen und Beiträge sind willkommen – als Issue oder Pull Request auf [GitHub](https://github.com/avibecoder42/ZotLLM/issues).
+
 ### Stile finden und übernehmen
 
 Links stehen drei Listen: **Eigene** (in ZotLLM bearbeitete Stile), **Zotero** (in Zotero installierte Stile) und **zotero.org** (Suche in den rund 10 000 Stilen des Zotero-Stilverzeichnisses, filterbar nach Format). Die Liste von zotero.org wird erst bei einer Suche geladen (einmalig rund 300 KB) und danach nur abgefragt, wenn sie sich geändert hat. Ausserdem lässt sich eine .csl-Datei importieren.
@@ -409,11 +415,19 @@ Fremde Stile sehen Sie zuerst nur in der Vorschau. **Als eigenen Stil übernehme
 
 ### Bearbeiten in der Vorschau
 
-Die Vorschau zeigt Belege im Text (mit Seitenangabe) und Einträge im Literaturverzeichnis für typische Dokumenttypen: Buch, Sammelbandbeitrag, Zeitschriftenartikel, Artikel mit vier Autor:innen, Zeitungsartikel, Webseite, Hochschulschrift, Bericht und herausgegebenes Buch. Eigene Einträge aus Zotero kommen unten über die Suche dazu. Die Sprache der Vorschau (Begriffe wie „S.“ oder „Hrsg.“) ist wählbar.
+Die Vorschau zeigt Belege im Text (mit Seitenangabe) und Einträge im Literaturverzeichnis für typische Dokumenttypen: Buch, Sammelbandbeitrag, Zeitschriftenartikel, Artikel mit vier Autor:innen, Zeitungsartikel, Webseite, Hochschulschrift, Bericht und herausgegebenes Buch. Gibt es in Ihrer Bibliothek einen passenden Eintrag, nimmt ZotLLM ihn (den vollständigsten; bei Artikeln mit der passenden Zahl Autor:innen, beim herausgegebenen Buch nur mit Herausgeber:innen) – sonst ein erfundenes englisches Beispiel. Einzelne eigene Einträge kommen unten über die Suche dazu. Die Sprache der Vorschau (Begriffe wie „S.“ oder „Hrsg.“) ist wählbar.
 
-**Klicken Sie auf einen Teil eines Belegs**, etwa auf die Jahreszahl: Rechts erscheinen genau die Eigenschaften dieses Bausteins – Text davor und danach, kursiv, fett, Kapitälchen, Gross-/Kleinschreibung; bei Namen „und“ oder „&“, Reihenfolge, Initialen und ab wie vielen Namen „et al.“ steht; bei Daten die Form; bei Seitenangaben „S.“ oder „Seite“. Die Leiste oben im Panel zeigt, wo der Baustein liegt; ein Klick darauf wählt die umgebende Gruppe. Teile lassen sich verschieben, entfernen oder um ein Feld ergänzen.
+**Eintragsarten wählen …** legt fest, welche Arten die Vorschau zeigt: Standardbeispiele lassen sich abwählen, und alle weiteren Arten, die Zotero kennt, kommen dazu – etwa Gerichtsentscheidung, Gesetz, Konferenzbeitrag, Vortrag, Film oder Datensatz. Die Liste und die Namen liefert Zotero selbst (zuletzt gespeicherte Fassung, wenn Zotero nicht läuft). Auch hier kommt das Beispiel aus Ihrer Bibliothek, wo es einen Eintrag dieser Art gibt; der Schalter oben im Fenster lässt stattdessen nur erfundene Beispiele zeigen. Das × an einem Beispiel blendet es aus, **Standardauswahl wiederherstellen** stellt die neun Standardbeispiele wieder her. Die Auswahl gilt für alle Stile. Hat ein Stil für eine Art keine eigene Regel, zeigt die Vorschau, wie er sie allgemein darstellt.
 
-Viele Stile verwenden Bausteine (Makros) an mehreren Stellen. Liegt der gewählte Teil in einem solchen Baustein, sagt das Panel, an wie vielen Stellen er wirkt. Nach jeder Änderung sind die betroffenen Beispiele markiert („Die letzte Änderung betrifft 5 von 9 Beispielen“). Ohne Auswahl zeigt das Panel Einstellungen für den ganzen Stil, z. B. „et al.“ in Belegen und Verzeichnis, hängender Einzug oder Seitenbereiche.
+**Sammlung …** zeigt die Einträge einer Zotero-Sammlung (mit Untersammlungen, höchstens 40) als Beispiele – etwa eine Sammlung mit typischen Fällen, an denen Sie einen Stil prüfen. Im Fenster wählen Sie die Sammlung aus Ihren Bibliotheken; **Nur diese Sammlung zeigen** blendet die Eintragsarten aus. Oben steht dann die Sammlung mit der Zahl der Einträge; ihr × hebt die Auswahl wieder auf.
+
+**Klicken Sie auf einen Teil eines Belegs**, etwa auf die Jahreszahl: Rechts erscheinen genau die Eigenschaften dieses Bausteins – Text davor und danach, kursiv, fett, Kapitälchen, Gross-/Kleinschreibung; bei Namen „und“ oder „&“, Reihenfolge, Initialen und ab wie vielen Namen „et al.“ steht; bei Daten die Form; bei Seitenangaben „S.“ oder „Seite“. Die Leiste oben im Panel zeigt den Weg vom Text bzw. Verzeichnis über die Bausteine bis zum angeklickten Teil; ein Klick darauf wählt diese Ebene – etwa die Stelle, an der ein Baustein im Verzeichnis steht. Teile lassen sich verschieben, entfernen oder um ein Feld ergänzen.
+
+**Verschieben:** **Früher** und **Später** tauschen mit dem Nachbarn; am Anfang bzw. Ende einer Gruppe verlässt der Teil die Gruppe. **Ganz nach vorne** und **Ganz nach hinten** setzen ihn an den Anfang bzw. das Ende des Eintrags (genauer: der äussersten Gruppe). Steht der gewählte Teil allein – wie das Jahr im Baustein „date“ –, verschiebt ZotLLM die nächsthöhere Ebene: die Stelle des Bausteins im Verzeichnis oder die ganze Bedingung („wenn Buch …, sonst …“), deren Fälle in ihrer Reihenfolge bleiben. Ein Hinweis sagt, was verschoben wird. So steht etwa das Jahr mit einem Klick auf **Ganz nach hinten** am Schluss des Eintrags.
+
+**„et al.“** braucht zwei Zahlen: **„et al.“ ab … Namen** (ab wie vielen Namen gekürzt wird) und **Davon nennen** (wie viele davor stehen bleiben). APA kürzt im Text ab 3 Namen auf den ersten, manche Verzeichnisse ab 6 Namen auf die ersten 3. Unter den Feldern steht ein Beispiel der Einstellung.
+
+Viele Stile verwenden Bausteine (Makros) an mehreren Stellen. Liegt der gewählte Teil in einem solchen Baustein, sagt das Panel, an wie vielen Stellen er wirkt. Oft teilen sich Belege im Text und Literaturverzeichnis einen Baustein, etwa für das Jahr. Dann erscheint **Änderung gilt**: Vorgegeben ist der Teil, in den Sie geklickt haben (**nur im Text** bzw. **nur im Verzeichnis**). Bei der ersten Änderung bekommt dieser Teil eine eigene Kopie des Bausteins (z. B. „date-bibliography“), der andere bleibt unverändert. Mit **in Text und Verzeichnis** wirkt die Änderung in beiden. Nach jeder Änderung sind die betroffenen Beispiele markiert („Die letzte Änderung betrifft 5 von 9 Beispielen“). Ohne Auswahl zeigt das Panel Einstellungen für den ganzen Stil, z. B. „et al.“ in Belegen und Verzeichnis, hängender Einzug oder Seitenbereiche.
 
 ### Code und frühere Fassungen
 

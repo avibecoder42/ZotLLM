@@ -171,13 +171,17 @@ class ZoteroClient:
         except ValueError:
             return {}
 
+    def schema(self) -> dict:
+        """Zotero-Schema: Eintragsarten mit Feldern und Rollen, ihre Namen in allen Sprachen, Zuordnung zu CSL."""
+        return self._get_json("/api/schema")
+
     def install_style(self, xml: str) -> None:
         """Eigenen Zitierstil über das ZotLLM-Plugin installieren (Zotero.Styles.install: sofort in Zotero und im
-        Word-Plugin verfügbar). Ohne Plugin ab 0.10.0: PluginMissing."""
+        Word-Plugin verfügbar). Ohne Plugin ab 1.0.0: PluginMissing."""
         r = self._request("POST", "/zotllm/styles/install", json={"style": xml},
                           headers={"Zotero-Server-ID": self.server_id, "X-ZotLLM": "1"})
         if r.status_code == 404:
-            raise PluginMissing("Für das direkte Installieren braucht es das ZotLLM-Plugin ab Version 0.10.0.")
+            raise PluginMissing("Für das direkte Installieren braucht es das ZotLLM-Plugin ab Version 1.0.0.")
         if r.status_code >= 400:
             try:
                 detail = r.json().get("error") or r.text

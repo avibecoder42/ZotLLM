@@ -27,6 +27,7 @@ from xml.sax.saxutils import escape as xesc
 
 from zotllm.engine import Engine
 from zotllm.index.store import strip_bidi
+from zotllm.rag.markdown import MATH, is_math, latex_to_text
 
 log = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class CiteItem:
     lib: str
     key: str
     locator: str = ""
+    suppress_author: bool = False  # Name steht schon im Satz („Shin et al. (2021)“)
 
 
 @dataclass
@@ -129,7 +131,7 @@ def sources_document(engine: Engine, message_id: int, language: str) -> Document
 
 
 def review_document(engine: Engine, review_id: int, language: str) -> Document:
-    from zotllm.rag.review import ReviewService, parse_citation
+    from zotllm.rag.review import ReviewService, named_before, parse_citation
 
     svc = ReviewService(engine)
     review = engine.store.get_review(review_id)
@@ -137,11 +139,15 @@ def review_document(engine: Engine, review_id: int, language: str) -> Document:
         raise KeyError(review_id)
     state = review["state"]
     docs = {d["item_key"]: d for d in engine.store.review_docs(review_id)}
+    data = svc._items((d["lib"], d["item_key"]) for d in docs.values())
     doc = Document(title=(state.get("outline") or {}).get("title") or review["title"], markdown="",
                    language=state.get("language") or language)
 
     def repl(m: re.Match) -> str:
         items = [CiteItem(docs[k]["lib"], k, page) for k, page in parse_citation(m.group(1)) if k in docs]
+        # „Shin et al. [@KEY]“: der Name steht schon im Satz – Zotero nennt im Beleg nur Jahr und Seite
+        if items and named_before(body[:m.start()], data.get((items[0].lib, items[0].key)) or {}):
+            items[0].suppress_author = True
         return doc.add_cite(items) if items else m.group(0)
 
     body = "\n\n".join(s["text"] for s in state.get("sections", []))
@@ -358,7 +364,9 @@ class Citations:
         for c in group:
             it = self.items.get((c.lib, c.key)) or {}
             styled = self.names.format(_family_names(it), self.language) if self.names.found else ""
-            if styled:
+            if c.suppress_author:
+                label = str(it.get("year") or ("o. J." if self.language == "de" else "n.d."))
+            elif styled:
                 year = it.get("year") or ("o. J." if self.language == "de" else "n.d.")
                 label = f"{styled}{loc.author_date}{year}"
             else:
@@ -397,6 +405,8 @@ class Citations:
                     entry["suffix"] = self.loc.suffix_for(self.no_page)
             elif c.locator:
                 entry.update(locator=c.locator, label="page")
+            if c.suppress_author:
+                entry["suppress-author"] = True
             items.append(entry)
         formatted = self.short(group)
         return json.dumps({"citationID": secrets.token_hex(5),
@@ -606,11 +616,21 @@ def to_latex(doc: Document, cit: Citations) -> str:
         keys = [cit.bibtex[(c.lib, c.key)][0] for c in group]
         if len(group) == 1:
             n = note(group[0])
-            return rf"\parencite[{n}]{{{keys[0]}}}" if n else rf"\parencite{{{keys[0]}}}"
+            cmd = r"\parencite*" if group[0].suppress_author else r"\parencite"  # * : nur Jahr, Name steht im Satz
+            return rf"{cmd}[{n}]{{{keys[0]}}}" if n else rf"{cmd}{{{keys[0]}}}"
         parts = "".join(f"[{note(c)}]{{{k}}}" if note(c) else f"{{{k}}}" for c, k in zip(group, keys))
         return rf"\parencites{parts}"
 
     def runs(text: str) -> str:
+        """Formeln ($\\beta = .35$) bleiben in LaTeX Formeln; der übrige Text wird maskiert."""
+        out, pos = [], 0
+        for m in MATH.finditer(text):
+            if is_math(m.group(1)):
+                out += [plain_runs(text[pos:m.start()]), f"${m.group(1)}$"]
+                pos = m.end()
+        return "".join(out) + plain_runs(text[pos:])
+
+    def plain_runs(text: str) -> str:
         out = []
         for p in inline(text):
             if p[0] == "cite":
@@ -665,6 +685,7 @@ def to_latex(doc: Document, cit: Citations) -> str:
 \\usepackage[T1]{{fontenc}}
 \\usepackage[utf8]{{inputenc}}
 \\usepackage[{babel}]{{babel}}
+\\usepackage{{amsmath}}
 \\usepackage{{csquotes}}
 \\usepackage[style={cit.biblatex_style()},backend=biber]{{biblatex}}
 \\addbibresource{{literatur.bib}}
@@ -874,6 +895,8 @@ def build(engine: Engine, kind: str, item_id: int, fmt: str) -> tuple[str, bytes
         raise ValueError("Unbekannte Art")
     cit = Citations(engine, doc.items(), settings.citation_style, doc.language if doc.language in LOCALES else "de")
     name = re.sub(r'[\\/:*?"<>|\n\r]+', " ", doc.title)[:80].strip() or "export"
+    if fmt != "tex":  # Formeln in LaTeX-Schreibweise ($\beta = .35$) als Text (β = .35); in LaTeX bleiben sie Formeln
+        doc.markdown = latex_to_text(doc.markdown)
     if fmt == "text":
         return name, {"text": to_text(doc, cit), "html": to_html(doc, cit), "from_zotero": cit.from_zotero}, "application/json"
     if fmt == "md":

@@ -332,27 +332,31 @@ Follow-up questions refer to the conversation so far. The project's previous que
 
 ## Literature review
 
-The literature review leads in four steps to a fully referenced overview text. Each step waits for your confirmation; you can go back to an earlier step at any time.
+The literature review leads in five steps to a fully referenced overview text. Each step waits for your confirmation; you can go back to an earlier step at any time. Every step has the same layout: the five steps at the top, below them the collapsed **Prompt** on the left (title, research question, corpora, language, target length) and on the right the buttons that take you further – always in the same place.
 
-### 1. Find texts
+### 1. Keywords
 
-You enter a research question, choose the project corpora, the language of the text and the target length. ZotLLM proposes a **search strategy**: many search queries in German and English, with synonyms and technical terms. They can be changed, deleted and added to – like search strings in literature databases.
+You enter a research question, choose the project corpora, the language of the text and the target length. ZotLLM proposes a **search strategy**: many search queries in German and English, with synonyms and technical terms. They can be changed, deleted and added to – like search strings in literature databases. **Start search** searches with all queries and moves on to the next step. Afterwards, each query shows how many texts it found and how many only it found; **Repeat search** searches again after a change (the previous ticks are lost).
 
-After **Start search**, each query shows how many texts it found and how many only it found. The helper model proposes a selection (suggested, maybe, excluded, each with a reason). You check the ticks. **As Zotero collection** creates the selection as a collection; items added there are brought back with **Take over from collection**. **Confirm selection** completes the step.
+### 2. Select literature
 
-### 2. Evaluate
+The helper model proposes a selection (suggested, maybe, excluded, each with a reason). You check the ticks. **As Zotero collection** creates the selection as a collection; items added there are brought back with **Take over from collection**. **Confirm selection** completes the step.
+
+### 3. Evaluate
 
 Each text is read individually – in full up to an adjustable length, otherwise the parts relevant to the question – and recorded in an **evaluation sheet**: research question, method, sample, findings, limitations and verbatim key quotations with page. ZotLLM does not leave the page of a key quotation to the language model: it looks the quotation up in the text and sets the printed page number (or "o. S."). Beforehand, ZotLLM shows the counted input tokens, the estimated output and reasoning tokens and – if prices are entered – the estimated costs. Sheets are reused; if you like, ZotLLM also saves them as a note on the Zotero item.
 
-### 3. Write
+Clicking a ticked text shows its evaluation sheet: short description, fields, key findings, key quotations and keywords, plus model, date and basis (full text or excerpts). Clicking the page of a key quotation opens the PDF in Zotero at that point. **Recreate sheet** reads only this text again and replaces the sheet (and the note in Zotero); text that has already been written stays unchanged.
 
-A **thematic outline** (not text by text) is created from all sheets. Headings, focus, word count and assigned texts can be adjusted, and sections can be added, moved and removed. The sections are then written one after the other; every statement is referenced to the text it comes from.
+### 4. Write
+
+A **thematic outline** (not text by text) is created from all sheets. Headings, focus, word count and assigned texts can be adjusted, and sections can be added, moved and removed. The sections are then written one after the other; every statement is referenced to the text it comes from. Once the text is written, ZotLLM switches to **Check** and shows it there.
 
 If the provider stops a section early – at the length limit (with Gemini, reasoning tokens count towards it) or because the output reproduced a longer passage verbatim (a Gemini block) – ZotLLM writes it a second time right away: with more room or with the instruction to quote verbatim more briefly. To rewrite a single section, use the pencil icon in the outline; the other sections stay unchanged.
 
-### 4. Check and output
+### 5. Check and output
 
-The check counts words and cited texts, looks up every verbatim quotation in the original text and reports citations of texts outside the selection. Quotations not found are often only hyphenation or omissions – still compare them with the PDF before use.
+The check counts words and cited texts, looks up every verbatim quotation in the original text and reports citations of texts outside the selection. Quotations not found are often only hyphenation or omissions – still compare them with the PDF before use. The findings are collapsed under **Check findings**; the line says what there is to check, a click shows the details. The text follows below.
 
 It also reports **incomplete sections**: stopped by the provider, with a quotation lacking its closing quotation mark, ending mid-sentence or, in addition, much shorter than planned. **Rewrite** next to the section replaces only that section. **Check again** repeats the check without a language model, e.g. after a change to the text.
 
@@ -400,6 +404,8 @@ Better change the style in ZotLLM later and export again rather than in Word: th
 
 Citation styles (CSL) define how citations and the bibliography look. In the **CSL editor** you adapt an existing style – for example your university's – and install it in Zotero. The preview uses **citeproc-js**, the same software Zotero uses to create citations: what you see is what appears in Word.
 
+> **First version:** the CSL editor is still in development. Feedback, bug reports and contributions are welcome – as an issue or pull request on [GitHub](https://github.com/avibecoder42/ZotLLM/issues).
+
 ### Finding and adopting styles
 
 On the left are three lists: **Mine** (styles edited in ZotLLM), **Zotero** (styles installed in Zotero) and **zotero.org** (search across the roughly 10,000 styles of the Zotero Style Repository, filterable by format). The zotero.org list is only loaded when you search (about 300 KB once) and afterwards only fetched again when it has changed. You can also import a .csl file.
@@ -408,11 +414,19 @@ Other styles are shown in the preview first. **Use as my own style** creates a c
 
 ### Editing in the preview
 
-The preview shows in-text citations (with a page reference) and bibliography entries for typical document types: book, book chapter, journal article, article with four authors, newspaper article, web page, thesis, report and edited book. Add your own Zotero items below via the search. The preview language (terms such as "p." or "ed.") can be chosen.
+The preview shows in-text citations (with a page reference) and bibliography entries for typical document types: book, book chapter, journal article, article with four authors, newspaper article, web page, thesis, report and edited book. If your library has a matching item, ZotLLM uses it (the most complete one; for articles with the matching number of authors, for the edited book with editors only) – otherwise a made-up English example. Add single items of your own below via the search. The preview language (terms such as "p." or "ed.") can be chosen.
 
-**Click a part of a citation**, for example the year: the panel on the right shows exactly that part's properties – text before and after, italic, bold, small caps, capitalisation; for names "and" or "&", order, initials and from how many names "et al." is used; for dates the form; for page references "p." or "page". The bar at the top of the panel shows where the part sits; clicking it selects the enclosing group. Parts can be moved, removed or followed by a new field.
+**Choose item types …** sets which types the preview shows: default examples can be deselected, and every other type Zotero knows can be added – e.g. case, statute, conference paper, presentation, film or dataset. The list and the names come from Zotero itself (the last saved version when Zotero is not running). Here too the example comes from your library where it has an item of that type; the switch at the top of the window shows made-up examples only instead. The × on an example hides it, **Restore default selection** brings back the nine default examples. The selection applies to all styles. If a style has no rule of its own for a type, the preview shows how it formats it in general.
 
-Many styles use macros in several places. If the selected part is inside such a macro, the panel says in how many places it applies. After each change the affected examples are marked ("The last change affects 5 of 9 examples"). Without a selection the panel shows settings for the whole style, e.g. "et al." in citations and bibliography, hanging indent or page ranges.
+**Collection …** shows the items of a Zotero collection (with subcollections, at most 40) as examples – e.g. a collection of typical cases to check a style against. In the window you choose the collection from your libraries; **Show only this collection** hides the item types. The collection and its number of items then appear at the top; its × removes the selection again.
+
+**Click a part of a citation**, for example the year: the panel on the right shows exactly that part's properties – text before and after, italic, bold, small caps, capitalisation; for names "and" or "&", order, initials and from how many names "et al." is used; for dates the form; for page references "p." or "page". The bar at the top of the panel shows the path from the text or bibliography via the macros to the clicked part; clicking selects that level – e.g. the place where a macro sits in the bibliography. Parts can be moved, removed or followed by a new field.
+
+**Moving:** **Earlier** and **Later** swap with the neighbour; at the start or end of a group, the part leaves the group. **To the start** and **To the end** put it at the start or end of the entry (more precisely: of the outermost group). If the selected part stands alone – like the year in the "date" macro – ZotLLM moves the next level up: the place of the macro in the bibliography or the whole condition ("if book …, else …"), whose cases keep their order. A note says what is moved. So one click on **To the end** puts the year at the end of the entry.
+
+**"et al."** needs two numbers: **"et al." from … names** (from how many names the list is shortened) and **Of these, show** (how many remain before it). APA shortens in-text citations from 3 names to the first one, some bibliographies from 6 names to the first 3. Below the fields an example of the setting is shown.
+
+Many styles use macros in several places. If the selected part is inside such a macro, the panel says in how many places it applies. In-text citations and bibliography often share a macro, e.g. for the year. Then **Change applies** appears: the default is the part you clicked (**only in text** or **only in bibliography**). With the first change, this part gets its own copy of the macro (e.g. "date-bibliography"); the other stays unchanged. With **in text and bibliography** the change applies to both. After each change the affected examples are marked ("The last change affects 5 of 9 examples"). Without a selection the panel shows settings for the whole style, e.g. "et al." in citations and bibliography, hanging indent or page ranges.
 
 ### Code and earlier versions
 

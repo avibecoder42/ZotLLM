@@ -14,14 +14,19 @@ import * as csl from '../core/csl.js';
 import { SAMPLES } from '../core/csl-samples.js';
 
 const EXTRA_KEY = 'zllm.csl.examples';
+const SET_KEY = 'zllm.csl.sampleset';
+// Vergleich ohne Gross-/Kleinschreibung und Akzente (Filter und Suchfelder)
+const fold = x => (x || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 const FORMATS = () => ({ 'author-date': t('Autor-Jahr'), numeric: t('numerisch'), note: t('Fussnote'), author: t('Autor'), label: t('Kürzel') });
 
 function st() {
   return ui('csl', {
     tab: 'own', own: null, zotero: null, zFilter: '', repoQuery: '', repoFormat: '', repo: null, repoBusy: false,
-    open: null, doc: null, xml: '', dirty: false, history: [], future: [], selected: null,
+    open: null, doc: null, xml: '', dirty: false, history: [], future: [], selected: null, selArea: null, scope: 'here', selPath: null,
     panel: 'props', code: '', codeError: '', lang: '', result: null, elements: [], changed: new Set(),
     engineReady: false, engineError: '', renderError: '', extra: null, pickQuery: '', pickResults: null,
+    sampleSet: null, typeSamples: null, typeLang: '', typeLoading: false, libExamples: {}, libLoading: false,
+    collExamples: null, collTotal: 0, collFor: null,
   });
 }
 
@@ -115,6 +120,7 @@ function setDoc(xml, { fresh = false, fromCode = false, keepSelection = true } =
   const s = st();
   const selIndex = keepSelection && s.selected ? s.elements.indexOf(s.selected) : -1;
   const selTag = s.selected ? s.selected.localName : '';
+  const pathIdx = keepSelection && s.selPath ? s.selPath.map(e => s.elements.indexOf(e)) : null;
   try {
     s.doc = csl.parseStyle(xml);
   } catch (err) {
@@ -127,19 +133,26 @@ function setDoc(xml, { fresh = false, fromCode = false, keepSelection = true } =
   if (!fromCode) s.code = xml;
   s.elements = csl.elements(s.doc);
   s.selected = selIndex >= 0 && s.elements[selIndex] && s.elements[selIndex].localName === selTag ? s.elements[selIndex] : null;
-  if (fresh) { s.selected = null; s.lang = ''; }
+  s.selPath = s.selected && pathIdx && pathIdx.every(i => i >= 0 && s.elements[i]) ? pathIdx.map(i => s.elements[i]) : null;
+  if (fresh) { s.selected = null; s.selPath = null; s.lang = ''; }
   rerender(fresh);
   return true;
 }
 
-// Änderung am Dokument: Verlauf, neu rendern, geänderte Beispiele markieren
-function commit(change) {
+// Änderung am Dokument: Verlauf, neu rendern, geänderte Beispiele markieren. Gilt die Änderung nur im angeklickten
+// Teil (Text oder Verzeichnis) und liegt target in einem gemeinsam genutzten Baustein, bekommt dieser Teil vorher
+// eigene Kopien; change(doc, m) bearbeitet dann mit m(element) das Gegenstück in der Kopie.
+function commit(change, target = null) {
   const s = st();
   if (!editable()) return;
   s.history.push(s.xml);
   if (s.history.length > 100) s.history.shift();
   s.future = [];
-  change(s.doc);
+  const map = scopedCopy(target);
+  const m = el => (map && map.get(el)) || el;
+  change(s.doc, m);
+  if (map && s.selected) s.selected = m(s.selected);
+  if (map && s.selPath) s.selPath = s.selPath.map(m);
   s.xml = csl.serializeStyle(s.doc, s.xml);
   s.code = s.xml;
   s.dirty = true;
@@ -148,10 +161,25 @@ function commit(change) {
 }
 
 function setAttr(el, name, value) {
-  commit(() => {
-    if (value === '' || value === null || value === undefined || value === false) el.removeAttribute(name);
-    else el.setAttribute(name, value === true ? 'true' : String(value));
-  });
+  commit((doc, m) => {
+    const x = m(el);
+    if (value === '' || value === null || value === undefined || value === false) x.removeAttribute(name);
+    else x.setAttribute(name, value === true ? 'true' : String(value));
+  }, el);
+}
+
+// Liegt die Auswahl in einem Baustein, den Text und Verzeichnis teilen?
+function sharedMacro(el) {
+  const s = st();
+  const { macro } = csl.context(el);
+  return macro && csl.isShared(csl.macroAreas(s.doc), macro) ? macro : null;
+}
+
+function scopedCopy(target) {
+  const s = st();
+  if (s.scope !== 'here' || !s.selArea || !target) return null;
+  const macro = sharedMacro(target);
+  return macro ? csl.separateMacro(s.doc, macro, s.selArea) : null;
 }
 
 function undo() {
@@ -246,9 +274,178 @@ function previewLang() {
   return loc || (state.settings && state.settings.language === 'en' ? 'en-US' : 'de-DE');
 }
 
+// Beispiele der Vorschau: Standardbeispiele (ausser ausgeblendeten), gewählte weitere Eintragsarten, eigene Einträge.
+// Gibt es in der Bibliothek einen passenden Eintrag, ersetzt er das erfundene Beispiel (sid: Kennung des Beispiels).
 function examples() {
   const s = st();
-  return [...SAMPLES(), ...(s.extra || []).map(x => ({ label: x.label, item: x.item, ref: x.ref }))];
+  const set = sampleSet();
+  const types = s.typeSamples || [];
+  const fromLibrary = ex => {
+    const x = set.library && s.libExamples[ex.sid];
+    if (!x) return ex;
+    const page = String(x.item.page || '').match(/\d+/);
+    const loc = ex.item.__locator ? (page ? page[0] : ex.item.__locator) : null;
+    return { ...ex, item: loc ? { ...x.item, __locator: loc } : x.item, fromLib: true, libTitle: x.title };
+  };
+  const coll = set.collection && s.collFor === set.collection.id ? (s.collExamples || []).filter(x => !set.collHidden.includes(x.ref))
+    .map(x => ({ label: x.label, item: x.item, ref: x.ref, kind: 'coll', libTitle: x.title })) : [];
+  const typed = set.collection && set.collectionOnly ? [] : [
+    ...SAMPLES().filter(x => !set.hidden.includes(x.item.id)).map(x => fromLibrary({ ...x, kind: 'default', sid: x.item.id })),
+    ...set.types.map(tp => types.find(x => x.type === tp)).filter(Boolean)
+      .map(x => fromLibrary({ label: x.label, item: x.item, kind: 'type', type: x.type, sid: `z:${x.type}` }))];
+  return [...typed, ...coll, ...(s.extra || []).map(x => ({ label: x.label, item: x.item, ref: x.ref, kind: 'own' }))];
+}
+
+// Einträge der gewählten Sammlung (mit Untersammlungen) als Beispiele
+async function loadCollectionExamples() {
+  const s = st();
+  const set = sampleSet();
+  if (!set.collection || s.collFor === set.collection.id) return;
+  const id = set.collection.id;
+  s.collFor = id;
+  s.collExamples = null;
+  try {
+    const r = await api.post('/api/csl/collection-examples', { collection: id, lang: state.settings && state.settings.language === 'en' ? 'en' : 'de' });
+    if (s.collFor !== id) return;
+    s.collExamples = r.items;
+    s.collTotal = r.total;
+  } catch (err) {
+    s.collExamples = [];
+    s.collTotal = 0;
+    toast(err.message, 'error');
+  }
+  rerender(true);
+}
+
+// Popup: eine Zotero-Sammlung als Beispiele wählen (Bibliotheken und Sammlungen wie in Zotero, mit Suchfeld)
+function chooseCollection() {
+  const set = sampleSet();
+  if (!state.tree) api.get('/api/zotero/tree').then(tr => { state.tree = tr; update(); }).catch(() => { state.tree = { libraries: [] }; update(); });
+  const pick = { id: set.collection ? set.collection.id : null, name: set.collection ? set.collection.name : '', only: set.collectionOnly !== false, filter: '' };
+  const apply = () => {
+    if (!pick.id) return;
+    set.collection = { id: pick.id, name: pick.name };
+    set.collectionOnly = pick.only;
+    set.collHidden = [];
+    st().collFor = null;
+    saveSampleSet();
+    closeModal();
+  };
+  openModal({
+    title: t('Sammlung als Beispiele'), wide: true,
+    body: () => {
+      const tree = state.tree;
+      const q = fold(pick.filter.trim());
+      const row = (node, depth) => h('button', { key: node.id, type: 'button', class: ['csl-coll', pick.id === node.id && 'active'],
+        style: { paddingLeft: `${10 + depth * 16}px` }, onclick: () => { pick.id = node.id; pick.name = node.name; update(); }, ondblclick: apply },
+      icon('folder', 14), h('span', { class: 'csl-coll-name' }, node.name), node.num_items != null ? h('span', { class: 'muted small' }, fmtInt(node.num_items)) : null);
+      const walk = (nodes, depth) => nodes.flatMap(n => [!q || fold(n.name).includes(q) ? row(n, q ? 0 : depth) : null, ...walk(n.children || [], depth + 1)]);
+      const libs = tree ? tree.libraries.map(lib => ({ lib, rows: walk(lib.collections || [], 0).filter(Boolean) })).filter(x => x.rows.length) : [];
+      return h('div', { class: 'stack' },
+        h('p', { class: 'muted small' }, t('Die Einträge der Sammlung (mit Untersammlungen, höchstens 40) erscheinen als Beispiele – etwa eine Sammlung mit typischen Fällen, an denen du den Stil prüfst.')),
+        textInput({ value: pick.filter, placeholder: t('Sammlung suchen …'), label: t('Sammlung suchen'), onInput: v => { pick.filter = v; update(); } }),
+        !tree ? h('div', { class: 'pad' }, spinner(16))
+          : h('div', { class: 'csl-coll-list' }, libs.length ? libs.map(({ lib, rows }) => [h('div', { class: 'csl-subhead', key: lib.id }, lib.name), ...rows])
+            : h('p', { class: 'muted small pad' }, q ? t('Keine Sammlung gefunden.') : t('Keine Sammlungen – ist Zotero geöffnet?'))),
+        checkbox({ checked: pick.only, label: t('Nur diese Sammlung zeigen (Eintragsarten ausblenden)'), onChange: v => { pick.only = v; update(); } }));
+    },
+    actions: () => [
+      set.collection ? { label: t('Keine Sammlung'), onClick: () => { set.collection = null; st().collFor = null; saveSampleSet(); closeModal(); } } : null,
+      { label: t('Abbrechen'), onClick: closeModal },
+      { label: t('Übernehmen'), kind: 'primary', disabled: !pick.id, onClick: apply },
+    ].filter(Boolean),
+  });
+}
+
+// Passende Einträge der eigenen Bibliothek für die gezeigten Beispiele (fehlt einer, bleibt das erfundene)
+async function loadLibraryExamples() {
+  const s = st();
+  const set = sampleSet();
+  if (!set.library || s.libLoading) return;
+  const want = [...SAMPLES().map(x => x.item.id).filter(id => !set.hidden.includes(id)), ...set.types.map(tp => `z:${tp}`)]
+    .filter(k => !(k in s.libExamples));
+  if (!want.length) return;
+  s.libLoading = true;
+  try {
+    const r = await api.post('/api/csl/library-examples', { examples: want });
+    for (const k of want) s.libExamples[k] = r.items[k] || null;
+  } catch {
+    for (const k of want) s.libExamples[k] = null;
+  }
+  s.libLoading = false;
+  rerender(true);
+  loadLibraryExamples();  // inzwischen dazugekommene Beispiele
+}
+
+// Auswahl der Beispiele (gilt für alle Stile): ausgeblendete Standardbeispiele und weitere Eintragsarten aus Zotero
+function sampleSet() {
+  const s = st();
+  if (!s.sampleSet) {
+    let v = null;
+    try { v = JSON.parse(localStorage.getItem(SET_KEY) || 'null'); } catch { v = null; }
+    s.sampleSet = { hidden: Array.isArray(v && v.hidden) ? v.hidden : [], types: Array.isArray(v && v.types) ? v.types : [],
+      library: !v || v.library !== false, collection: v && v.collection && v.collection.id ? v.collection : null,
+      collectionOnly: !v || v.collectionOnly !== false, collHidden: Array.isArray(v && v.collHidden) ? v.collHidden : [] };
+  }
+  return s.sampleSet;
+}
+
+function saveSampleSet() {
+  try { localStorage.setItem(SET_KEY, JSON.stringify(sampleSet())); } catch { /* privat */ }
+  rerender(true);
+  loadLibraryExamples();
+  loadCollectionExamples();
+}
+
+// Liste und Beispiele der weiteren Eintragsarten (Namen in der Sprache der Oberfläche); ohne Zotero leer
+async function loadTypeSamples() {
+  const s = st();
+  const lang = state.settings && state.settings.language === 'en' ? 'en' : 'de';
+  if (s.typeLoading || (s.typeSamples && s.typeSamples.length && s.typeLang === lang)) return;
+  s.typeLoading = true;
+  try { s.typeSamples = (await api.get(`/api/csl/item-types?lang=${lang}`)).types; } catch { s.typeSamples = []; }
+  s.typeLang = lang;
+  s.typeLoading = false;
+  if (sampleSet().types.length) rerender(true);
+  update();
+}
+
+function removeExample(ex) {
+  const set = sampleSet();
+  if (ex.kind === 'own') { removeExtra(ex.ref); return; }
+  if (ex.kind === 'coll') set.collHidden = [...set.collHidden, ex.ref];
+  if (ex.kind === 'type') set.types = set.types.filter(x => x !== ex.type);
+  else set.hidden = [...set.hidden, ex.sid];
+  saveSampleSet();
+}
+
+function chooseExamples() {
+  loadTypeSamples();
+  const toggle = (list, value, on) => (on ? [...new Set([...list, value])] : list.filter(x => x !== value));
+  openModal({
+    title: t('Eintragsarten wählen'), wide: true,
+    body: () => {
+      const s = st();
+      const set = sampleSet();
+      return h('div', { class: 'stack' },
+        h('p', { class: 'muted small' }, t('Die Auswahl gilt für alle Stile. Eigene Einträge aus Zotero lassen sich unten in der Vorschau hinzufügen.')),
+        checkbox({ key: 'lib', checked: set.library, label: t('Beispiele aus meiner Zotero-Bibliothek nehmen, wo es passende Einträge gibt'),
+          onChange: v => { set.library = v; saveSampleSet(); update(); } }),
+        h('div', { class: 'csl-subhead' }, t('Standard')),
+        h('div', { class: 'csl-type-grid' }, SAMPLES().map(x => checkbox({ key: x.item.id, label: x.label, checked: !set.hidden.includes(x.item.id),
+          onChange: v => { set.hidden = toggle(set.hidden, x.item.id, !v); saveSampleSet(); update(); } }))),
+        h('div', { class: 'csl-subhead' }, t('Weitere Eintragsarten aus Zotero')),
+        s.typeSamples === null || s.typeLoading ? spinner(16) : s.typeSamples.length
+          ? h('div', { class: 'csl-type-grid' }, s.typeSamples.map(x => checkbox({ key: x.type, label: x.label, checked: set.types.includes(x.type),
+            onChange: v => { set.types = toggle(set.types, x.type, v); saveSampleSet(); update(); } })))
+          : notice('info', t('Die Liste der Eintragsarten kommt aus Zotero. Bitte Zotero starten und das Fenster erneut öffnen.')),
+        h('p', { class: 'muted small' }, t('Aus der Bibliothek kommt je Art der vollständigste passende Eintrag (bei Artikeln mit der passenden Zahl Autor:innen, beim herausgegebenen Buch nur mit Herausgeber:innen). Fehlt einer, erscheint ein erfundenes Beispiel mit englischen Angaben (bei Gerichtsentscheidung, Gesetz und Norm bekannte Quellen).')));
+    },
+    actions: [
+      { label: t('Standardauswahl wiederherstellen'), onClick: () => { const set = sampleSet(); set.hidden = []; set.types = []; saveSampleSet(); update(); } },
+      { label: t('Fertig'), kind: 'primary', onClick: closeModal },
+    ],
+  });
 }
 
 async function rerender(fresh) {
@@ -295,7 +492,8 @@ function annotated(id, kind) {
   const frag = csl.annotate(clean, marked);
   const box = document.createElement('div');
   box.appendChild(frag);
-  if (s.selected) {
+  const elsewhere = s.scope === 'here' && s.selArea && s.selArea !== (kind === 'bib' ? 'bibliography' : 'citation') && s.selected && sharedMacro(s.selected);
+  if (s.selected && !elsewhere) {
     const sel = String(s.renderElements.indexOf(s.selected));
     box.querySelectorAll('.csl-node').forEach(n => { if (n.dataset.path.split(' ').includes(sel)) n.classList.add('csl-sel'); });
   }
@@ -310,6 +508,9 @@ function onPreviewClick(e) {
   const el = s.renderElements[path[path.length - 1]];
   if (!el) return;
   s.selected = el;
+  s.selPath = path.map(i => s.renderElements[i]).filter(Boolean);
+  s.selArea = node.closest('.csl-bib') ? 'bibliography' : 'citation';
+  s.scope = 'here';
   s.panel = 'props';
   update();
 }
@@ -321,12 +522,25 @@ function exampleCard(ex) {
   return h('div', { key: id, class: ['csl-example', changed && 'changed'] },
     h('div', { class: 'csl-example-head' },
       h('span', { class: 'csl-example-label' }, ex.label),
+      ex.fromLib && badge(t('aus deiner Bibliothek'), 'neutral', ex.libTitle),
+      ex.kind === 'coll' && badge(t('aus der Sammlung'), 'neutral', ex.libTitle),
       changed && badge(t('geändert'), 'info', t('Diese Ausgabe hat sich mit der letzten Änderung verändert.')),
-      ex.ref && iconBtn('x', t('Beispiel entfernen'), () => removeExtra(ex.ref))),
+      iconBtn('x', ex.kind === 'own' ? t('Beispiel entfernen') : t('Beispiel ausblenden'), () => removeExample(ex))),
     h('div', { class: 'csl-out-row' }, h('span', { class: 'csl-out-label' }, t('Im Text')),
       h('div', { class: 'csl-out', html: annotated(id, 'cites') || '–' })),
     s.result && Object.keys(s.result.clean.bib).length ? h('div', { class: 'csl-out-row' }, h('span', { class: 'csl-out-label' }, t('Verzeichnis')),
       h('div', { class: 'csl-out csl-bib', html: annotated(id, 'bib') || '–' })) : null);
+}
+
+function collectionChip() {
+  const s = st();
+  const set = sampleSet();
+  if (!set.collection) return null;
+  const n = s.collFor === set.collection.id && s.collExamples ? s.collExamples.length : null;
+  return h('span', { class: 'chip chip-accent csl-coll-chip', title: n !== null && s.collTotal > n ? t('{n} von {total} Einträgen', { n, total: s.collTotal }) : undefined },
+    icon('folder', 12), h('span', null, n === null ? set.collection.name : `${set.collection.name} (${n})`),
+    h('button', { type: 'button', class: 'chip-x', title: t('Sammlung entfernen'),
+      onclick: () => { set.collection = null; s.collFor = null; saveSampleSet(); update(); } }, icon('x', 11)));
 }
 
 function gallery() {
@@ -341,11 +555,15 @@ function gallery() {
   return h('div', { class: 'csl-gallery' },
     h('div', { class: 'csl-gallery-bar' },
       select({ value: s.lang, options: langs, label: t('Sprache der Vorschau'), onChange: v => { s.lang = v; rerender(true); } }),
+      btn(t('Eintragsarten wählen …'), { size: 'sm', kind: 'ghost', icon: 'sliders', onClick: chooseExamples }),
+      btn(t('Sammlung …'), { size: 'sm', kind: 'ghost', icon: 'folder', onClick: chooseCollection, title: t('Eine Zotero-Sammlung als Beispiele zeigen') }),
+      collectionChip(),
       nChanged ? h('span', { class: 'csl-impact' }, icon('info', 14),
         t('Die letzte Änderung betrifft {n} von {m} Beispielen.', { n: nChanged, m: ex.length })) : h('span', { class: 'muted small' },
         editable() ? t('Auf einen Teil eines Belegs klicken, um ihn zu bearbeiten.') : t('Auf einen Teil klicken, um zu sehen, woher er stammt.'))),
     s.renderError ? notice('error', t('Fehler im Stil: {msg}', { msg: s.renderError })) : null,
-    h('div', { class: 'csl-examples', onclick: onPreviewClick }, ex.map(exampleCard)),
+    h('div', { class: 'csl-examples', onclick: onPreviewClick }, ex.length ? ex.map(exampleCard)
+      : h('p', { class: 'muted pad' }, t('Keine Eintragsarten gewählt – oben „Eintragsarten wählen …“.'))),
     ownExamples());
 }
 
@@ -447,6 +665,7 @@ function describe(el) {
     case 'number': return t('Zahl: {name}', { name });
     case 'label': return t('Bezeichnung zu {name} (z. B. „S.“)', { name: name || t('Seitenangabe') });
     case 'group': return t('Gruppe');
+    case 'choose': return t('Bedingung (je nach Eintrag)');
     case 'layout': return t('Gesamter Beleg bzw. Eintrag');
     case 'citation': return t('Belege im Text');
     case 'bibliography': return t('Literaturverzeichnis');
@@ -496,12 +715,29 @@ function nameOptions(name) {
       { value: 'first', label: t('erster Name: Nachname, Vorname') }, { value: 'all', label: t('alle: Nachname, Vorname') }]),
     attrInput(name, 'initialize-with', t('Vornamen abkürzen mit'), { placeholder: t('leer = ausschreiben, z. B. „. “'), help: t('Zeichen nach jeder Initiale, z. B. „. “ ergibt „A. B. Muster“. Leer: Vornamen ausschreiben.') }),
     attrSelect(name, 'form', t('Form'), [{ value: '', label: t('ganzer Name') }, { value: 'short', label: t('nur Nachname') }, { value: 'count', label: t('Anzahl') }]),
-    h('div', { class: 'field-row', key: 'etal' },
-      field(t('„et al.“ ab'), numberInput({ value: name.getAttribute('et-al-min') ? Number(name.getAttribute('et-al-min')) : null, min: 1, max: 50, int: true, nullable: true,
-        disabled: ro, placeholder: '–', label: t('„et al.“ ab'), onChange: v => setAttr(name, 'et-al-min', v) }), { help: t('Ab wie vielen Namen „et al.“ steht. Leer: Einstellung des Stils (Allgemein).') }),
-      field(t('Namen davor'), numberInput({ value: name.getAttribute('et-al-use-first') ? Number(name.getAttribute('et-al-use-first')) : null, min: 1, max: 50, int: true, nullable: true,
-        disabled: ro, placeholder: '–', label: t('Namen davor'), onChange: v => setAttr(name, 'et-al-use-first', v) }), { help: t('Wie viele Namen vor „et al.“ stehen.') })),
+    ...etAlFields(name, { inherit: true }),
   ];
+}
+
+// „et al.“ braucht zwei Zahlen: ab wie vielen Namen gekürzt wird und wie viele davon stehen bleiben (APA im Text:
+// ab 3 Namen nur der erste; manche Verzeichnisse: ab 6 Namen die ersten 3). Darunter ein Beispiel der Einstellung.
+function etAlFields(el, { inherit = false } = {}) {
+  const ro = !editable();
+  const num = (attr, label, help) => field(label, numberInput({ value: el.getAttribute(attr) ? Number(el.getAttribute(attr)) : null, min: 1, max: 50,
+    int: true, nullable: true, disabled: ro, placeholder: '–', label, onChange: v => setAttr(el, attr, v) }), { help, key: attr });
+  const min = Number(el.getAttribute('et-al-min')) || 0;
+  const first = Number(el.getAttribute('et-al-use-first')) || 0;
+  const names = ['Miller', 'Okoye', 'Nakamura', 'Brooks', 'Garcia', 'Weber', 'Tanaka', 'Novak'];
+  const shown = names.slice(0, Math.min(first, names.length)).join(', ');
+  const example = min && first
+    ? (first === 1 ? t('Ab {min} Namen steht nur der erste, dann „et al.“ – z. B. „{names} et al.“', { min, names: shown })
+      : t('Ab {min} Namen stehen nur die ersten {first}, dann „et al.“ – z. B. „{names} et al.“', { min, first, names: shown }))
+    : min || first ? t('Erst beide Zahlen zusammen kürzen die Namen.')
+      : inherit ? t('Leer: wie für Belege bzw. Verzeichnis eingestellt (Ansicht ohne Auswahl).') : t('Leer: keine gemeinsame Vorgabe – es gilt, was beim jeweiligen Namensformat steht, sonst stehen alle Namen.');
+  return [h('div', { class: 'field-row', key: 'etal' },
+    num('et-al-min', t('„et al.“ ab … Namen'), t('Ab wie vielen Namen gekürzt wird. Bei weniger Namen stehen alle.')),
+    num('et-al-use-first', t('Davon nennen'), t('Wie viele Namen vor „et al.“ stehen bleiben.'))),
+  h('p', { class: 'muted small csl-etal-example', key: 'etal-ex' }, example)];
 }
 
 function variableSelect(el) {
@@ -543,7 +779,7 @@ function propsFor(el) {
   if (tag === 'names') {
     let name = [...el.children].find(c => c.localName === 'name');
     if (name) out.push(h('div', { class: 'csl-subhead', key: 'nameshead' }, t('Namen')), ...nameOptions(name));
-    else if (editable()) out.push(btn(t('Namensformat hinzufügen'), { size: 'sm', icon: 'plus', onClick: () => commit(doc => el.insertBefore(csl.createElement(doc, 'name'), el.firstChild)) }));
+    else if (editable()) out.push(btn(t('Namensformat hinzufügen'), { size: 'sm', icon: 'plus', onClick: () => commit((doc, m) => m(el).insertBefore(csl.createElement(doc, 'name'), m(el).firstChild), el) }));
   }
   if (tag === 'name') out.push(...nameOptions(el));
   if (tag === 'date') {
@@ -575,40 +811,86 @@ function structureActions(el) {
   const addField = () => {
     const v = insertState.variable;
     if (!v) return;
-    commit(doc => {
+    commit((doc, m) => {
       const node = NAME_VARS.has(v) ? csl.createElement(doc, 'names', { variable: v, prefix: ', ' })
         : DATE_VARS.has(v) ? csl.createElement(doc, 'date', { variable: v, form: 'numeric', prefix: ', ' })
           : csl.createElement(doc, 'text', { variable: v, prefix: ', ' });
       if (node.localName === 'names') node.appendChild(csl.createElement(doc, 'name'));
-      csl.insertAfter(el, node);
+      csl.insertAfter(m(el), node);
       s.selected = node;
-    });
+    }, el);
   };
+  const target = moveTarget(el);
+  const move = (fn, dir) => commit((doc, m) => fn(m(target), dir), target);
   return h('div', { class: 'csl-structure' },
+    target && target !== el ? h('p', { class: 'muted small' }, t('Verschoben wird: {target} – der gewählte Teil steht darin allein.', { target: describe(target) }))
+      : !target ? h('p', { class: 'muted small' }, t('Hier lässt sich nichts verschieben: Das ist der ganze Beleg bzw. Eintrag. Zum Verschieben auf einen einzelnen Teil klicken.')) : null,
+    h('div', { class: 'row wrap' },
+      btn(t('Ganz nach vorne'), { size: 'sm', icon: 'arrowLeft', disabled: !target || !csl.canMoveToEdge(target, -1), title: t('An den Anfang der Gruppe bzw. des Eintrags'),
+        onClick: () => move(csl.moveToEdge, -1) }),
+      btn(t('Früher'), { size: 'sm', icon: 'arrowLeft', disabled: !target || !csl.canMove(target, -1), title: t('Mit dem vorherigen Teil tauschen; am Anfang einer Gruppe vor die Gruppe'),
+        onClick: () => move(csl.moveElement, -1) }),
+      btn(t('Später'), { size: 'sm', icon: 'arrowRight', disabled: !target || !csl.canMove(target, 1), title: t('Mit dem nächsten Teil tauschen; am Ende einer Gruppe hinter die Gruppe'),
+        onClick: () => move(csl.moveElement, 1) }),
+      btn(t('Ganz nach hinten'), { size: 'sm', icon: 'arrowRight', disabled: !target || !csl.canMoveToEdge(target, 1), title: t('An das Ende der Gruppe bzw. des Eintrags'),
+        onClick: () => move(csl.moveToEdge, 1) })),
     h('div', { class: 'row' },
-      btn(t('Früher'), { size: 'sm', icon: 'arrowLeft', disabled: !csl.siblingElement(el, -1), title: t('Mit dem vorherigen Teil tauschen'),
-        onClick: () => commit(() => csl.moveElement(el, -1)) }),
-      btn(t('Später'), { size: 'sm', icon: 'arrowRight', disabled: !csl.siblingElement(el, 1), title: t('Mit dem nächsten Teil tauschen'),
-        onClick: () => commit(() => csl.moveElement(el, 1)) }),
-      btn(t('Entfernen'), { size: 'sm', icon: 'trash', kind: 'ghost', onClick: () => { commit(() => csl.removeElement(el)); s.selected = null; update(); } })),
+      btn(t('Entfernen'), { size: 'sm', icon: 'trash', kind: 'ghost', onClick: () => { commit((doc, m) => csl.removeElement(m(el)), el); s.selected = null; update(); } })),
     h('div', { class: 'row' },
       select({ value: insertState.variable, label: t('Feld einfügen'), options: [{ value: '', label: t('Feld danach einfügen …') },
         ...INSERTABLE.map(v => ({ value: v, label: vars[v] || v }))], onChange: v => { insertState.variable = v; update(); } }),
       btn(t('Einfügen'), { size: 'sm', icon: 'plus', disabled: !insertState.variable, onClick: addField })));
 }
 
+// Leiste über der Auswahl: nach einem Klick der Weg vom Text bzw. Verzeichnis über die Aufrufe der Bausteine bis zum
+// angeklickten Teil – so lässt sich auch die Stelle wählen, an der ein Baustein steht (etwa um ihn zu verschieben)
+function fullChain(el) {
+  const chain = csl.pathChain(st().selPath);
+  return chain && chain.includes(el) ? chain : csl.context(el).chain;
+}
+
+function selectionChain(el) {
+  const chain = fullChain(el);
+  const keep = c => ['citation', 'bibliography', 'macro', 'layout', 'group', 'choose', 'names', 'date'].includes(c.localName)
+    || (c.localName === 'text' && c.getAttribute('macro'));
+  return chain.filter((c, i) => keep(c) || c === el || i === chain.length - 1);
+}
+
+// Was verschoben wird: der gewählte Teil oder – steht er allein (wie das Jahr im Baustein „date“ oder ein Baustein im
+// Fall einer Bedingung) – die nächste höhere Ebene, die sich verschieben lässt: die Stelle des Bausteins im Verzeichnis
+// bzw. die ganze Bedingung. Die Fälle einer Bedingung selbst bleiben in ihrer Reihenfolge.
+function moveTarget(el) {
+  const chain = fullChain(el);
+  for (let i = chain.indexOf(el); i >= 0; i--) {
+    const c = chain[i];
+    if (['citation', 'bibliography', 'layout', 'macro', 'style'].includes(c.localName)) break;
+    if (['if', 'else-if', 'else'].includes(c.localName)) continue;
+    if (csl.canMove(c, -1) || csl.canMove(c, 1)) return c;
+  }
+  return null;
+}
+
 function selectedPanel(el) {
   const s = st();
-  const { macro, chain } = csl.context(el);
-  const crumbs = chain.filter(c => ['citation', 'bibliography', 'macro', 'group', 'names', 'date', 'layout'].includes(c.localName) || c === el);
+  const { macro } = csl.context(el);
+  const crumbs = selectionChain(el);
   const uses = macro ? csl.macroUses(s.doc, macro) : 0;
+  const shared = editable() && s.selArea && sharedMacro(el);
+  const bib = s.selArea === 'bibliography';
   return h('div', { class: 'stack' },
     h('div', { class: 'csl-crumbs' }, crumbs.map((c, i) => h('button', { key: i, type: 'button', class: ['csl-crumb', c === el && 'active'],
       onclick: () => { s.selected = c; update(); } }, describe(c)))),
     h('h3', { class: 'csl-sel-title' }, describe(el)),
-    macro ? notice('info', uses > 1
-      ? t('Teil des Bausteins „{name}“, der an {n} Stellen verwendet wird. Änderungen wirken überall dort – die betroffenen Beispiele werden markiert.', { name: macro, n: uses })
-      : t('Teil des Bausteins „{name}“.', { name: macro })) : null,
+    shared ? h('div', { class: 'csl-scope' },
+      field(t('Änderung gilt'), segmented({ size: 'sm', value: s.scope, onChange: v => { s.scope = v; update(); }, options: [
+        { value: 'here', label: bib ? t('nur im Verzeichnis') : t('nur im Text') }, { value: 'all', label: t('in Text und Verzeichnis') }] }),
+      { help: s.scope === 'here'
+        ? (bib ? t('Text und Verzeichnis verwenden hier denselben Baustein „{name}“. Bei der ersten Änderung bekommt das Verzeichnis eine eigene Kopie davon; der Text bleibt, wie er ist.', { name: macro })
+          : t('Text und Verzeichnis verwenden hier denselben Baustein „{name}“. Bei der ersten Änderung bekommt der Text eine eigene Kopie davon; das Verzeichnis bleibt, wie es ist.', { name: macro }))
+        : t('Der Baustein „{name}“ wird in Text und Verzeichnis verwendet – die Änderung wirkt in beiden.', { name: macro }) }))
+      : macro ? notice('info', uses > 1
+        ? t('Teil des Bausteins „{name}“, der an {n} Stellen verwendet wird. Änderungen wirken überall dort – die betroffenen Beispiele werden markiert.', { name: macro, n: uses })
+        : t('Teil des Bausteins „{name}“.', { name: macro })) : null,
     !editable() ? notice('info', t('Zum Bearbeiten zuerst als eigenen Stil übernehmen.')) : null,
     h('div', { class: 'csl-props' }, propsFor(el)),
     structureActions(el),
@@ -628,10 +910,8 @@ function generalPanel() {
   return h('div', { class: 'stack' },
     h('p', { class: 'muted small' }, editable() ? t('Auf einen Teil eines Belegs in der Vorschau klicken, um genau diesen Teil zu bearbeiten. Hier stehen die Einstellungen für den ganzen Stil.')
       : t('Vorschau eines fremden Stils. Zum Bearbeiten oben „Als eigenen Stil übernehmen“ wählen.')),
-    cit ? h('div', { class: 'csl-props' }, h('div', { class: 'csl-subhead' }, t('Belege im Text')),
-      h('div', { class: 'field-row' }, num(cit, 'et-al-min', t('„et al.“ ab'), t('Ab wie vielen Namen „et al.“ steht.')), num(cit, 'et-al-use-first', t('Namen davor')))) : null,
-    bib ? h('div', { class: 'csl-props' }, h('div', { class: 'csl-subhead' }, t('Literaturverzeichnis')),
-      h('div', { class: 'field-row' }, num(bib, 'et-al-min', t('„et al.“ ab')), num(bib, 'et-al-use-first', t('Namen davor'))),
+    cit ? h('div', { class: 'csl-props' }, h('div', { class: 'csl-subhead' }, t('Belege im Text')), ...etAlFields(cit)) : null,
+    bib ? h('div', { class: 'csl-props' }, h('div', { class: 'csl-subhead' }, t('Literaturverzeichnis')), ...etAlFields(bib),
       field(null, checkbox({ checked: bib.getAttribute('hanging-indent') === 'true', disabled: ro, label: t('Hängender Einzug'),
         onChange: v => setAttr(bib, 'hanging-indent', v) }), { key: 'hang' }),
       attrInput(bib, 'subsequent-author-substitute', t('Wiederholte Autor:innen ersetzen durch'), { placeholder: t('leer = immer ausschreiben, z. B. „———“') })) : null,
@@ -702,8 +982,9 @@ function styleList() {
       })))
       : h('p', { class: 'muted small pad' }, t('Noch keine eigenen Stile. Suche einen Stil auf zotero.org oder in Zotero und übernimm ihn als Vorlage.'));
   } else if (s.tab === 'zotero') {
-    const f = s.zFilter.trim().toLowerCase();
-    const list = (s.zotero || []).filter(z => !f || z.title.toLowerCase().includes(f));
+    // Wie die Suche auf zotero.org: ohne Gross-/Kleinschreibung und Akzente, jedes Wort in Titel, Kurztitel oder Kennung
+    const words = fold(s.zFilter).split(/\s+/).filter(Boolean);
+    const list = (s.zotero || []).filter(z => { const hay = fold(`${z.title} ${z.short || ''} ${z.id}`); return words.every(w => hay.includes(w)); });
     body = [textInput({ value: s.zFilter, placeholder: t('Filtern …'), label: t('Installierte Stile filtern'), onInput: v => { s.zFilter = v; update(); } }),
       s.zotero === null ? spinner(16) : list.length ? list.slice(0, 300).map(z => item(z.id, s.open && s.open.kind === 'zotero' && s.open.id === z.id, z.title,
         [fmt[z.format] || z.format, z.dependent && t('abhängig')].filter(Boolean).join(' · '), () => openZotero(z)))
@@ -774,18 +1055,31 @@ function editorMain() {
   return h('div', { class: 'csl-main' }, toolbar(), gallery());
 }
 
+const ISSUES = 'https://github.com/avibecoder42/ZotLLM/issues';
+
+// Hinweis auf den Entwicklungsstand (einmal ausblendbar)
+function earlyNotice() {
+  return notice('info', t('Erste Version: Der CSL-Editor ist noch in Entwicklung. Hinweise und Beiträge sind willkommen!'),
+    h('div', { class: 'notice-actions' }, btn(t('Auf GitHub melden'), { size: 'sm', kind: 'ghost', icon: 'external', onClick: () => api.openExternal(ISSUES) })),
+    { dismiss: 'csl-early-1' });
+}
+
 export function cslEditorView() {
   const s = st();
   loadExtra();
+  loadLibraryExamples();
+  loadCollectionExamples();
+  if (s.typeSamples === null && sampleSet().types.length) loadTypeSamples();
   const keys = e => {
     if (!(e.ctrlKey || e.metaKey) || !editable()) return;
     if (e.key.toLowerCase() === 'z' && !e.shiftKey && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') { e.preventDefault(); undo(); }
     if (e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
   };
   return h('div', { class: 'view-wrap', onkeydown: keys },
-    viewHeader(t('CSL-Editor'), t('Zitierstile suchen, anpassen und in Zotero installieren – gilt für alle Projekte')),
+    viewHeader(t('CSL-Editor'), t('Zitierstile suchen, anpassen und in Zotero installieren – gilt für alle Projekte'), [],
+      badge(t('Erste Version'), 'warning', t('Der CSL-Editor ist noch in Entwicklung.'))),
     h('div', { class: 'csl-layout' }, styleList(),
-      h('div', { class: 'col-main scroll' }, h('div', { class: 'col-inner' }, editorMain())),
+      h('div', { class: 'col-main scroll' }, h('div', { class: 'col-inner' }, earlyNotice(), editorMain())),
       s.open && s.doc && !s.open.loading ? sidePanel() : null));
 }
 

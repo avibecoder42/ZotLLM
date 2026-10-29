@@ -146,6 +146,16 @@ def wait_job(client, job_id):
     raise AssertionError("Auftrag läuft zu lange")
 
 
+def test_sheet_view(client, zengine):
+    q = {"lib": "users/0", "key": "ITEMA001"}
+    assert client.get("/api/sheets", params=q).status_code == 404
+    zengine.store.put_sheet("users/0", "ITEMA001", {"methode": "Befragung", "_basis": "Volltext", "kernzitate": [
+        {"zitat": "emotionale Unterstützung das wichtigste Motiv ist", "seite": "1"}]}, "test-model")
+    r = client.get("/api/sheets", params=q).json()
+    assert r["sheet"] == {"methode": "Befragung"} and r["model"] == "test-model" and r["basis"] == "Volltext"
+    assert r["quotes"][0]["url"].startswith("zotero://open-pdf/library/items/ATTA0001") and r["note_select"] is None
+
+
 def test_zotero_tree(client):
     tree = client.get("/api/zotero/tree").json()
     assert tree["online"] is True

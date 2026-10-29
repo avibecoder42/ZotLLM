@@ -1,25 +1,29 @@
-// Forschungsstand in vier Schritten: Texte finden (Suchstrategie → Suche → Auswahl bestätigen) → auswerten →
-// schreiben → prüfen. Alles im aktiven Projekt; durchsucht werden die gewählten Korpora des Projekts.
+// Forschungsstand in fünf Schritten: Stichworte (Suchstrategie) → Literatur auswählen (Suche, Auswahl bestätigen) →
+// auswerten → schreiben → prüfen. Alles im aktiven Projekt; durchsucht werden die gewählten Korpora des Projekts.
+// Jeder Schritt sieht gleich aus: oben die Schritte, darunter links der eingeklappte Prompt und rechts die Knöpfe zum
+// Weitermachen, darunter der Inhalt des Schritts.
 import { h } from '../core/vdom.js';
 import { state, update, ui, toast, run, confirmDialog, watchJob, runningJob, loadStatus, loadProjects, project, projectCorpora } from '../core/store.js';
 import * as api from '../core/api.js';
 import { t, OUTPUT_LANGUAGES, languageName } from '../core/i18n.js';
 import { icon } from '../ui/icons.js';
-import { btn, iconBtn, card, notice, spinner, progress, field, textInput, textArea, select, segmented, numberInput, checkbox, badge, emptyState, multiSelect, paneProps, splitter } from '../ui/components.js';
-import { fmtInt, fmtAgo, fmtDuration, fmtNum, plural, nTexts, nIndexed } from '../core/util.js';
+import { btn, iconBtn, card, foldCard, notice, spinner, progress, field, textInput, textArea, select, segmented, numberInput, checkbox, badge, emptyState, multiSelect, paneProps, splitter } from '../ui/components.js';
+import { fmtInt, fmtAgo, fmtDate, fmtDuration, fmtNum, plural, nTexts, nIndexed } from '../core/util.js';
 import { markdown } from '../core/markdown.js';
 import { navigate, viewHeader, openCitePopover } from './shell.js';
 import { exportMenu, copyTarget } from './exports.js';
 import { coverageNotice } from './embedmodels.js';
 
 const STEPS = () => [
-  { n: 1, title: t('Texte finden'), sub: t('Suchstrategie, Suche, Auswahl') },
-  { n: 2, title: t('Auswerten'), sub: t('Auswertungsblatt je Text') },
-  { n: 3, title: t('Schreiben'), sub: t('Gliederung und Abschnitte') },
-  { n: 4, title: t('Prüfen'), sub: t('Belege, Zitate, Ausgabe') },
+  { n: 1, title: t('Stichworte'), sub: t('Suchanfragen prüfen und ergänzen') },
+  { n: 2, title: t('Literatur auswählen'), sub: t('Suche und Auswahl') },
+  { n: 3, title: t('Auswerten'), sub: t('Auswertungsblatt je Text') },
+  { n: 4, title: t('Schreiben'), sub: t('Gliederung und Abschnitte') },
+  { n: 5, title: t('Prüfen'), sub: t('Belege, Zitate, Text, Ausgabe') },
 ];
-// Fortschritt laut Dienst → aktueller Schritt
-const STEP_OF = { created: 1, strategy: 1, candidates: 1, confirmed: 2, extracted: 3, outlined: 3, written: 4 };
+// Fortschritt laut Dienst → letzter erreichbarer Schritt
+const STEP_OF = { created: 1, strategy: 1, candidates: 2, confirmed: 3, extracted: 4, outlined: 4, written: 5 };
+const reachedOf = r => STEP_OF[r.state.step] || 1;
 const DECISIONS = () => ({
   include: [t('vorgeschlagen'), 'success'], maybe: [t('vielleicht'), 'warning'], exclude: [t('ausgeschlossen'), 'neutral'], manual: [t('in Zotero ergänzt'), 'info'],
 });
@@ -27,7 +31,7 @@ const DECISIONS = () => ({
 function st() {
   return ui('review', { list: null, openId: null, review: null, loading: false, tab: null, filter: 'all', estimate: null,
     outline: null, outlineDirty: false, form: null, presetCorpus: null, jobId: null,
-    queries: null, queriesDirty: false, editTitle: null, text: null });
+    queries: null, queriesDirty: false, editTitle: null, text: null, promptOpen: false, sheets: {}, sheetOpen: {} });
 }
 
 async function loadList() {
@@ -45,11 +49,11 @@ async function openReview(id, { keepTab = false } = {}) {
     const r = await api.get(`/api/reviews/${id}`);
     if (s.openId !== id) return;
     s.review = r;
-    if (!keepTab) s.tab = null;
+    if (!keepTab) { s.tab = null; s.sheetOpen = {}; }
     s.estimate = null;
     s.outline = null; s.outlineDirty = false;
     s.queries = null; s.queriesDirty = false; s.editTitle = null;
-    s.text = null;
+    s.text = null; s.sheets = {};
   } catch (err) { toast(err.message, 'error'); s.openId = null; s.review = null; }
   s.loading = false;
   update();
@@ -78,18 +82,20 @@ function corpusIds(r) {
   return f.corpus_ids || (f.corpus_id ? [f.corpus_id] : []);
 }
 
-// Hintergrundauftrag des Forschungsstands starten und beobachten
-async function startJob(path, okMessage) {
+// Hintergrundauftrag des Forschungsstands starten und beobachten; nextTab: danach zu diesem Schritt wechseln
+async function startJob(path, okMessage, { nextTab = null, body } = {}) {
   const s = st();
   const rid = s.review.id;
-  const job = await run(() => api.post(path));
+  const job = await run(() => api.post(path, body));
   state.jobs[job.id] = job;
   s.jobId = job.id;
   update();
   const done = await watchJob(job.id);
   if (s.jobId === job.id) s.jobId = null;
-  if (done.status === 'done') toast(done.message || okMessage, 'success');
-  else if (done.status === 'error') toast(done.error, 'error', 12000);
+  if (done.status === 'done') {
+    toast(done.message || okMessage, 'success');
+    if (nextTab && s.review && s.review.id === rid) s.tab = nextTab;
+  } else if (done.status === 'error') toast(done.error, 'error', 12000);
   if (s.review && s.review.id === rid) await openReview(rid, { keepTab: true });
   loadList();
   loadProjects();
@@ -196,14 +202,20 @@ function newReviewForm() {
 }
 
 // ------------------------------------------------------------------ Schritte
+// Jeder Schritt liefert { actions, body }: die Knöpfe zum Weitermachen (oben rechts, immer an derselben Stelle)
+// und den Inhalt darunter.
 function stepper(r, active) {
   const s = st();
-  const reached = STEP_OF[r.state.step] || 1;
+  const reached = reachedOf(r);
   return h('ol', { class: 'stepper' }, STEPS().map(x => h('li', { key: x.n },
     h('button', { type: 'button', class: ['step', x.n === active && 'active', x.n < reached && 'done'], disabled: x.n > reached,
       onclick: () => { s.tab = x.n; update(); } },
     h('span', { class: 'step-num' }, x.n < reached ? icon('check', 14) : x.n),
     h('span', { class: 'step-text' }, h('span', { class: 'step-title' }, x.title), h('span', { class: 'step-sub' }, x.sub))))));
+}
+
+function nextBtn(n, label) {
+  return btn(label, { kind: 'primary', icon: 'chevronRight', onClick: () => { st().tab = n; update(); } });
 }
 
 function docTitle(d) {
@@ -212,32 +224,40 @@ function docTitle(d) {
     h('div', { class: 'muted small' }, d.citation));
 }
 
-// Suchstrategie: Suchanfragen prüfen, ändern, ergänzen – wie Suchstrings in Literaturdatenbanken
-function strategyCard(r, job) {
+async function saveQueries(r) {
+  const s = st();
+  const saved = await run(() => api.put(`/api/reviews/${r.id}/strategy`, { queries: s.queries }));
+  if (!saved) return;
+  s.review = saved; s.queries = [...saved.state.queries]; s.queriesDirty = false; update();
+}
+
+// 1. Stichworte: Suchanfragen prüfen, ändern, ergänzen – wie Suchstrings in Literaturdatenbanken
+function step1(r, job) {
   const s = st();
   if (s.queries === null) s.queries = [...(r.state.queries || [])];
   const q = s.queries;
   const stats = Object.fromEntries((r.state.query_stats || []).map(x => [x.query, x]));
   const searched = (r.state.query_stats || []).length > 0;
-  const confirmed = (STEP_OF[r.state.step] || 1) > 1;
+  const confirmed = reachedOf(r) > 2;
   const dirty = () => { s.queriesDirty = true; };
-  const save = async () => {
-    const saved = await run(() => api.put(`/api/reviews/${r.id}/strategy`, { queries: s.queries }));
-    s.review = saved; s.queries = [...saved.state.queries]; s.queriesDirty = false; update();
-  };
+  const ids = corpusIds(r);
+  const nQueries = q.filter(x => x.trim()).length;
   const search = async () => {
     if (searched && !await confirmDialog(t('Suche wiederholen?'), t('Die Kandidatenliste wird neu erstellt; deine bisherigen Häkchen gehen verloren.'), { ok: t('Neu suchen') })) return;
-    if (s.queriesDirty) await save();
-    startJob(`/api/reviews/${r.id}/candidates`, t('Texte gefunden'));
+    if (s.queriesDirty) await saveQueries(r);
+    startJob(`/api/reviews/${r.id}/candidates`, t('Texte gefunden'), { nextTab: 2 });
   };
   const regenerate = async () => {
     if (q.length && !await confirmDialog(t('Neue Vorschläge?'), t('Die aktuellen Suchanfragen werden durch neue Vorschläge ersetzt.'), { ok: t('Ersetzen') })) return;
     s.queries = null;
     startJob(`/api/reviews/${r.id}/strategy`, t('Suchstrategie vorgeschlagen'));
   };
-  const ids = corpusIds(r);
-  const nQueries = q.filter(x => x.trim()).length;
-  return card(t('Suchstrategie'), 'search', h('div', { class: 'stack' },
+  const searchBtn = btn(searched ? t('Suche wiederholen') : t('Suche starten ({n} Anfragen)', { n: nQueries }), {
+    kind: searched ? 'secondary' : 'primary', icon: 'search', disabled: !!job || !nQueries || !ids.length,
+    why: !ids.length ? t('Mindestens einen Korpus wählen.') : t('Mindestens eine Suchanfrage.'), onClick: search });
+  const actions = confirmed ? [nextBtn(2, t('Weiter: Literatur auswählen'))]
+    : searched ? [searchBtn, nextBtn(2, t('Weiter: Literatur auswählen'))] : [searchBtn];
+  const body = card(t('Suchstrategie'), 'search', h('div', { class: 'stack' },
     h('p', { class: 'muted small' }, t('Jede Zeile ist eine eigene Suche (Bedeutung + Stichworte) in den gewählten Korpora; AND/OR wirken hier nicht. Gut sind beide Sprachen, Synonyme, Fachbegriffe und Zielgruppen-Bezeichnungen – kurze Stichwortanfragen und ganze Sätze gemischt. Nach der Suche siehst du, wie viele Texte jede Anfrage gefunden hat und wie viele nur durch sie.')),
     field(t('Durchsuchte Korpora'), confirmed ? h('div', { class: 'chips' }, ids.map(id => h('span', { key: id, class: 'chip chip-accent' }, h('span', null, (state.corpora.find(c => c.id === id) || { name: t('Korpus {id}', { id }) }).name))))
       : multiSelect({ values: ids, options: corpusOptions(), label: t('Korpora'), placeholder: t('Korpora wählen …'),
@@ -257,18 +277,20 @@ function strategyCard(r, job) {
         requestAnimationFrame(() => { const all = document.querySelectorAll('.query-row input'); all[all.length - 1]?.focus(); }); } }),
       btn(q.length ? t('Neu vorschlagen') : t('Suchstrategie vorschlagen'), { size: 'sm', kind: q.length ? 'ghost' : 'primary', icon: 'ai', disabled: !!job, onClick: regenerate }),
       h('div', { class: 'spacer' }),
-      s.queriesDirty && btn(t('Änderungen speichern'), { size: 'sm', icon: 'check', onClick: save }),
-      btn(searched ? t('Suche wiederholen') : t('Suche starten ({n} Anfragen)', { n: nQueries }), { kind: searched ? 'secondary' : 'primary', icon: 'search',
-        disabled: !!job || !nQueries || !ids.length, why: !ids.length ? t('Mindestens einen Korpus wählen.') : t('Mindestens eine Suchanfrage.'), onClick: search }))));
+      s.queriesDirty && btn(t('Änderungen speichern'), { size: 'sm', icon: 'check', onClick: () => saveQueries(r) }))));
+  return { actions, body };
 }
 
-function step1(r, job) {
+// 2. Literatur auswählen: gefundene Texte prüfen, Häkchen setzen, Auswahl bestätigen
+function step2(r, job) {
   const s = st();
   const docs = r.docs || [];
   const included = docs.filter(d => d.included).length;
-  const confirmed = (STEP_OF[r.state.step] || 1) > 1;
-  const strategy = strategyCard(r, job);
-  if (!docs.length) return h('div', { class: 'stack' }, job && jobBox(job), strategy);
+  const confirmed = reachedOf(r) > 2;
+  const actions = confirmed ? [nextBtn(3, t('Weiter: Auswerten'))]
+    : [btn(t('Auswahl bestätigen ({n} Texte)', { n: included }), { kind: 'primary', icon: 'check', disabled: !included || !!job, why: t('Mindestens einen Text auswählen.'),
+      onClick: async () => { await run(() => api.post(`/api/reviews/${r.id}/confirm`)); st().tab = 3; openReview(r.id, { keepTab: true }); } })];
+  if (!docs.length) return { actions, body: job ? null : notice('info', t('Noch keine Texte gefunden – in Schritt 1 die Suche starten.')) };
   const counts = { all: docs.length };
   for (const d of docs) counts[d.decision] = (counts[d.decision] || 0) + 1;
   counts.selected = included;
@@ -278,33 +300,28 @@ function step1(r, job) {
     d.included = v; update();
     await run(() => api.post(`/api/reviews/${r.id}/docs`, { lib: d.lib, item_key: d.item_key, included: v }));
   };
-  return h('div', { class: 'stack' },
-    job && jobBox(job),
-    strategy,
-    card(t('Gefundene Texte ({n})', { n: docs.length }), 'file', h('div', { class: 'stack' },
-      !confirmed && notice('info', h('span', null, h('b', null, t('{a} von {b} Texten ausgewählt.', { a: included, b: docs.length })), ' ',
-        t('Prüfe die Auswahl: Häkchen setzen oder entfernen. Du kannst die Auswahl auch als Zotero-Sammlung anlegen, dort ergänzen und wieder übernehmen.'))),
-      h('div', { class: 'row wrap' },
-        segmented({ size: 'sm', value: s.filter, onChange: v => { s.filter = v; update(); }, options: [
-          { value: 'all', label: t('Alle'), badge: counts.all }, { value: 'selected', label: t('Ausgewählt'), badge: counts.selected },
-          { value: 'include', label: t('Vorgeschlagen'), badge: counts.include || 0 }, { value: 'maybe', label: t('Vielleicht'), badge: counts.maybe || 0 },
-          { value: 'exclude', label: t('Ausgeschlossen'), badge: counts.exclude || 0 }] }),
-        h('div', { class: 'spacer' }),
-        btn(r.state.collection_key ? t('Sammlung aktualisieren') : t('Als Zotero-Sammlung'), { size: 'sm', icon: 'folder',
-          onClick: async () => { const x = await run(() => api.post(`/api/reviews/${r.id}/collection/export`)); toast(t('{n} Texte in der Zotero-Sammlung „ZotLLM – {title}“', { n: x.added, title: r.title }), 'success'); openReview(r.id, { keepTab: true }); } }),
-        r.state.collection_key && btn(t('Aus Sammlung übernehmen'), { size: 'sm', icon: 'download',
-          onClick: async () => { const x = await run(() => api.post(`/api/reviews/${r.id}/collection/import`)); toast(t('{a} Texte ausgewählt, davon {b} in Zotero ergänzt', { a: x.included, b: x.added }), 'success'); openReview(r.id, { keepTab: true }); } })),
-      h('div', { class: 'doc-list' }, shown.length ? shown.map(d => {
-        const [label, kind] = decisions[d.decision] || [d.decision, 'neutral'];
-        return h('div', { key: d.lib + d.item_key, class: ['doc-row', d.included && 'selected'] },
-          checkbox({ checked: !!d.included, onChange: v => toggleDoc(d, v), title: t('In den Forschungsstand aufnehmen') }),
-          docTitle(d),
-          h('div', { class: 'doc-meta' }, badge(label, kind), d.hits ? h('span', { class: 'muted small' }, plural(d.hits, t('Treffer'), t('Treffer'))) : null,
-            d.reason && h('div', { class: 'muted small doc-reason' }, d.reason)));
-      }) : h('p', { class: 'muted pad' }, t('Keine Texte in dieser Ansicht.'))))),
-    !confirmed && h('div', { class: 'row end sticky-actions' },
-      btn(t('Auswahl bestätigen ({n} Texte)', { n: included }), { kind: 'primary', icon: 'check', disabled: !included || !!job, why: t('Mindestens einen Text auswählen.'),
-        onClick: async () => { await run(() => api.post(`/api/reviews/${r.id}/confirm`)); st().tab = 2; openReview(r.id, { keepTab: true }); } })));
+  const body = card(t('Gefundene Texte ({n})', { n: docs.length }), 'file', h('div', { class: 'stack' },
+    !confirmed && notice('info', h('span', null, h('b', null, t('{a} von {b} Texten ausgewählt.', { a: included, b: docs.length })), ' ',
+      t('Prüfe die Auswahl: Häkchen setzen oder entfernen. Du kannst die Auswahl auch als Zotero-Sammlung anlegen, dort ergänzen und wieder übernehmen.'))),
+    h('div', { class: 'row wrap' },
+      segmented({ size: 'sm', value: s.filter, onChange: v => { s.filter = v; update(); }, options: [
+        { value: 'all', label: t('Alle'), badge: counts.all }, { value: 'selected', label: t('Ausgewählt'), badge: counts.selected },
+        { value: 'include', label: t('Vorgeschlagen'), badge: counts.include || 0 }, { value: 'maybe', label: t('Vielleicht'), badge: counts.maybe || 0 },
+        { value: 'exclude', label: t('Ausgeschlossen'), badge: counts.exclude || 0 }] }),
+      h('div', { class: 'spacer' }),
+      btn(r.state.collection_key ? t('Sammlung aktualisieren') : t('Als Zotero-Sammlung'), { size: 'sm', icon: 'folder',
+        onClick: async () => { const x = await run(() => api.post(`/api/reviews/${r.id}/collection/export`)); toast(t('{n} Texte in der Zotero-Sammlung „ZotLLM – {title}“', { n: x.added, title: r.title }), 'success'); openReview(r.id, { keepTab: true }); } }),
+      r.state.collection_key && btn(t('Aus Sammlung übernehmen'), { size: 'sm', icon: 'download',
+        onClick: async () => { const x = await run(() => api.post(`/api/reviews/${r.id}/collection/import`)); toast(t('{a} Texte ausgewählt, davon {b} in Zotero ergänzt', { a: x.included, b: x.added }), 'success'); openReview(r.id, { keepTab: true }); } })),
+    h('div', { class: 'doc-list' }, shown.length ? shown.map(d => {
+      const [label, kind] = decisions[d.decision] || [d.decision, 'neutral'];
+      return h('div', { key: d.lib + d.item_key, class: ['doc-row', d.included && 'selected'] },
+        checkbox({ checked: !!d.included, onChange: v => toggleDoc(d, v), title: t('In den Forschungsstand aufnehmen') }),
+        docTitle(d),
+        h('div', { class: 'doc-meta' }, badge(label, kind), d.hits ? h('span', { class: 'muted small' }, plural(d.hits, t('Treffer'), t('Treffer'))) : null,
+          d.reason && h('div', { class: 'muted small doc-reason' }, d.reason)));
+    }) : h('p', { class: 'muted pad' }, t('Keine Texte in dieser Ansicht.')))));
+  return { actions, body };
 }
 
 function tokenRange([lo, hi]) {
@@ -312,7 +329,8 @@ function tokenRange([lo, hi]) {
   return lo === hi ? k(lo) : `${k(lo)}–${k(hi)}`;
 }
 
-function step2(r, job) {
+// 3. Auswerten: ein Auswertungsblatt je Text
+function step3(r, job) {
   const s = st();
   const docs = (r.docs || []).filter(d => d.included);
   const withSheet = docs.filter(d => d.has_sheet).length;
@@ -322,11 +340,15 @@ function step2(r, job) {
   }
   const e = s.estimate;
   const cfg = state.settings && state.settings.review;
-  const extracted = (STEP_OF[r.state.step] || 1) > 2;
+  const extracted = reachedOf(r) > 3;
   const money = v => fmtNum(v, 2);
-  return h('div', { class: 'stack' },
+  const extract = label => btn(label, { kind: extracted ? 'secondary' : 'primary', icon: 'play', disabled: !docs.length || !!job,
+    onClick: () => startJob(`/api/reviews/${r.id}/extract`, t('Auswertungsblätter erstellt')) });
+  const actions = !extracted ? [extract(t('Auswertungsblätter erstellen'))]
+    : [withSheet < docs.length ? extract(t('Fehlende Blätter erstellen')) : null, nextBtn(4, t('Weiter: Schreiben'))];
+  const body = h('div', { class: 'stack' },
     h('p', { class: 'muted' }, t('Jeder Text wird einzeln gelesen (bis zu einer bestimmten Länge ganz, sonst die zur Frage passenden Teile) und in einem Auswertungsblatt festgehalten: Fragestellung, Methode, Stichprobe, Befunde, Grenzen und wörtliche Kernzitate mit Seite.')),
-    job ? jobBox(job) : h('div', { class: 'stats-row' },
+    job ? null : h('div', { class: 'stats-row' },
       stat(t('Texte'), fmtInt(docs.length)), stat(t('mit Blatt'), fmtInt(withSheet)),
       e ? stat(t('neu zu erstellen'), fmtInt(e.missing_sheets)) : null,
       e && e.missing_sheets ? stat(t('Input-Token (gezählt)'), tokenRange([e.input_tokens, e.input_tokens])) : null,
@@ -337,14 +359,73 @@ function step2(r, job) {
     e && e.missing_sheets ? h('p', { class: 'muted small' }, t('Output-Token: erfahrungsgemäss 800–1500 pro Blatt. Denk-Token hängen von der Denktiefe ab ({e}) und werden vom Anbieter wie Output-Token berechnet.', { e: e.effort || t('Modellstandard') })) : null,
     cfg && h('p', { class: 'muted small' }, t('Modell für die Blätter: {m} ({role}).', { m: e ? e.model : '', role: cfg.sheet_model === 'main' ? t('Hauptmodell') : t('Hilfsmodell') }), ' ',
       cfg.write_notes_to_zotero ? t('Jedes Blatt wird zusätzlich als Notiz (Schlagwort „{tag}“) am Zotero-Eintrag gespeichert – dafür braucht es den Schreibzugriff.', { tag: cfg.note_tag }) : t('Blätter werden nur in ZotLLM gespeichert.')),
-    !job && h('div', { class: 'row end' },
-      extracted && btn(t('Weiter zu Schritt 3'), { icon: 'chevronRight', onClick: () => { s.tab = 3; update(); } }),
-      btn(withSheet === docs.length && docs.length ? t('Fehlende Blätter erstellen') : t('Auswertungsblätter erstellen'), {
-        kind: extracted ? 'secondary' : 'primary', icon: 'play', disabled: !docs.length,
-        onClick: () => startJob(`/api/reviews/${r.id}/extract`, t('Auswertungsblätter erstellt')) })),
-    h('div', { class: 'doc-list' }, docs.map(d => h('div', { key: d.lib + d.item_key, class: 'doc-row' },
-      h('span', { class: ['sheet-mark', d.has_sheet && 'ok'], title: d.has_sheet ? t('Auswertungsblatt vorhanden') : t('noch kein Blatt') }, icon(d.has_sheet ? 'check' : 'dot', 14)),
-      docTitle(d)))));
+    withSheet ? h('p', { class: 'muted small' }, t('Ein Klick auf einen Text mit Häkchen zeigt sein Auswertungsblatt.')) : null,
+    h('div', { class: 'doc-list' }, docs.map(d => sheetRow(r, d, job))));
+  return { actions, body };
+}
+
+// Ein Text in „Auswerten“: mit Blatt aufklappbar
+function sheetRow(r, d, job) {
+  const s = st();
+  const k = `${d.lib}:${d.item_key}`;
+  const mark = h('span', { class: ['sheet-mark', d.has_sheet && 'ok'], title: d.has_sheet ? t('Auswertungsblatt vorhanden') : t('noch kein Blatt') }, icon(d.has_sheet ? 'check' : 'dot', 14));
+  if (!d.has_sheet) return h('div', { key: k, class: 'doc-row' }, mark, docTitle(d));
+  const open = !!s.sheetOpen[k];
+  return h('div', { key: k, class: ['doc-row', 'sheet-row', open && 'open'] }, mark,
+    h('div', { class: 'doc-text' },
+      h('button', { type: 'button', class: 'sheet-toggle', 'aria-expanded': open ? 'true' : 'false', onclick: () => { s.sheetOpen[k] = !open; update(); } },
+        icon(open ? 'chevronDown' : 'chevronRight', 14), h('span', { class: 'doc-title' }, d.title || d.item_key)),
+      h('div', { class: 'muted small sheet-cite' }, d.citation),
+      open && sheetView(r, d, job)));
+}
+
+const SHEET_FIELDS = () => [['textsorte', t('Textsorte')], ['fragestellung', t('Fragestellung')], ['theorie', t('Theorie')],
+  ['methode', t('Methode')], ['stichprobe', t('Stichprobe')], ['land_kontext', t('Land/Kontext')], ['zeitraum', t('Zeitraum')],
+  ['grenzen', t('Grenzen')]];
+
+// Grundlage laut Dienst: „Volltext“ oder „Auszüge (n von m Abschnitten)“
+function sheetBasis(b) {
+  const m = /^Auszüge \((\d+) von (\d+)/.exec(b || '');
+  return m ? t('Auszüge ({a} von {b} Abschnitten)', { a: m[1], b: m[2] }) : b === 'Volltext' ? t('ganzer Text') : b;
+}
+
+// Auswertungsblatt eines Textes; Kernzitate öffnen die PDF in Zotero an der Seite
+function sheetView(r, d, job) {
+  const s = st();
+  const k = `${d.lib}:${d.item_key}`;
+  if (!(k in s.sheets)) {
+    s.sheets[k] = null;
+    api.get(`/api/sheets?lib=${encodeURIComponent(d.lib)}&key=${encodeURIComponent(d.item_key)}`)
+      .then(x => { s.sheets[k] = x; update(); }).catch(err => { s.sheets[k] = { error: err.message }; update(); });
+  }
+  const v = s.sheets[k];
+  if (!v) return h('div', { class: 'pad' }, spinner(16));
+  if (v.error) return notice('error', v.error);
+  const x = v.sheet;
+  const list = val => (Array.isArray(val) ? val : val ? [val] : []).map(String);
+  const page = p => p === 'o. S.' ? t('o. S.') : t('S. {p}', { p });
+  const rebuild = async () => {
+    if (!await confirmDialog(t('Blatt neu erstellen?'), t('„{title}“ wird erneut gelesen und ausgewertet; das bisherige Blatt wird ersetzt. Ein bereits geschriebener Text bleibt unverändert.', { title: d.title || d.item_key }), { ok: t('Neu erstellen') })) return;
+    startJob(`/api/reviews/${r.id}/sheets/rebuild`, t('Auswertungsblatt neu erstellt'), { body: { lib: d.lib, item_key: d.item_key } });
+  };
+  const findings = list(x.zentrale_befunde);
+  const keywords = list(x.stichworte);
+  return h('div', { class: 'sheet' },
+    x.kurzbeschreibung ? h('p', { class: 'sheet-lead' }, String(x.kurzbeschreibung)) : null,
+    h('dl', { class: 'sheet-fields' }, SHEET_FIELDS().filter(([f]) => list(x[f]).length).flatMap(([f, label]) => [
+      h('dt', { key: `${f}-t` }, label), h('dd', { key: f }, list(x[f]).join('; '))])),
+    findings.length ? h('div', { class: 'stack-sm' }, h('h4', null, t('Zentrale Befunde')),
+      h('ul', { class: 'sheet-list' }, findings.map((b, i) => h('li', { key: i }, b)))) : null,
+    v.quotes.length ? h('div', { class: 'stack-sm' }, h('h4', null, t('Kernzitate')),
+      v.quotes.map((q, i) => h('blockquote', { key: i, class: 'sheet-quote' }, `„${q.zitat}“`,
+        q.seite ? h('span', { class: 'sheet-page' }, q.url ? h('a', { href: q.url, title: t('PDF in Zotero öffnen') }, page(q.seite)) : page(q.seite)) : null))) : null,
+    keywords.length ? h('div', { class: 'chips' }, keywords.map((w, i) => h('span', { key: i, class: 'chip sheet-chip' }, h('span', null, w)))) : null,
+    h('div', { class: 'sheet-foot' },
+      h('span', { class: 'muted small' }, [v.model && t('Erstellt mit {m}', { m: v.model }), fmtDate(v.created_at), v.basis && t('Grundlage: {b}', { b: sheetBasis(v.basis) })].filter(Boolean).join(' · ')),
+      h('div', { class: 'sheet-actions' },
+        btn(t('In Zotero zeigen'), { size: 'sm', kind: 'ghost', icon: 'zotero', onClick: () => api.openExternal(d.zotero_select) }),
+        v.note_select ? btn(t('Notiz in Zotero zeigen'), { size: 'sm', kind: 'ghost', icon: 'file', onClick: () => api.openExternal(v.note_select) }) : null,
+        btn(t('Blatt neu erstellen'), { size: 'sm', icon: 'refresh', disabled: !!job, why: t('Es läuft bereits ein Auftrag.'), onClick: rebuild }))));
 }
 
 function stat(label, value) {
@@ -372,6 +453,7 @@ function outlineEditor(r) {
             h('button', { class: 'chip-x', title: t('Entfernen'), onclick: () => { sec.keys = sec.keys.filter(x => x !== k); dirty(); } }, icon('x', 11)))))),
       h('div', { class: 'outline-tools' },
         i < (r.state.sections || []).length && iconBtn('edit', t('Diesen Abschnitt neu schreiben'), () => rewriteSection(r, i), { disabled: s.outlineDirty || !!currentJob() }),
+        iconBtn('chevronUp', t('Nach oben'), () => move(i, -1), { disabled: i === 0 }),
         iconBtn('chevronDown', t('Nach unten'), () => move(i, 1), { disabled: i === o.sections.length - 1 }),
         iconBtn('trash', t('Abschnitt entfernen'), () => { o.sections.splice(i, 1); dirty(); }))))),
     h('div', { class: 'row' },
@@ -385,21 +467,21 @@ function outlineEditor(r) {
       } })));
 }
 
-function step3(r, job) {
+// 4. Schreiben: Gliederung, dann die Abschnitte – der fertige Text erscheint unter „Prüfen“
+function step4(r, job) {
   const s = st();
   const hasOutline = !!r.state.outline;
   const written = (r.state.sections || []).length;
-  return h('div', { class: 'stack' },
-    h('p', { class: 'muted' }, t('Aus allen Auswertungsblättern entsteht eine thematische Gliederung (nicht Text für Text). Du kannst sie anpassen, bevor die Abschnitte nacheinander geschrieben werden. Jede Aussage wird mit dem Text belegt, aus dem sie stammt.')),
-    job && jobBox(job),
-    !job && h('div', { class: 'row end' },
-      btn(hasOutline ? t('Gliederung neu erstellen') : t('Gliederung erstellen'), { kind: hasOutline ? 'ghost' : 'primary', icon: 'layers',
-        onClick: async () => { if (hasOutline && !await confirmDialog(t('Gliederung neu erstellen?'), t('Die bisherige Gliederung und bereits geschriebene Abschnitte werden ersetzt.'), { ok: t('Neu erstellen') })) return; s.outline = null; startJob(`/api/reviews/${r.id}/outline`, t('Gliederung erstellt')); } }),
-      hasOutline && btn(written ? t('Neu schreiben') : t('Abschnitte schreiben'), { kind: written ? 'secondary' : 'primary', icon: 'edit', disabled: s.outlineDirty, why: t('Zuerst die Gliederung speichern.'),
-        onClick: () => startJob(`/api/reviews/${r.id}/write`, t('Forschungsstand geschrieben')) })),
-    written && !job ? incompleteCard(r, job) : null,
-    hasOutline ? card(t('Gliederung'), 'layers', outlineEditor(r)) : null,
-    written ? textCard(r, t('Text ({n})', { n: plural(written, t('Abschnitt'), t('Abschnitte')) })) : null);
+  const outline = btn(hasOutline ? t('Gliederung neu erstellen') : t('Gliederung erstellen'), { kind: hasOutline ? 'ghost' : 'primary', icon: 'layers', disabled: !!job,
+    onClick: async () => { if (hasOutline && !await confirmDialog(t('Gliederung neu erstellen?'), t('Die bisherige Gliederung und bereits geschriebene Abschnitte werden ersetzt.'), { ok: t('Neu erstellen') })) return; s.outline = null; startJob(`/api/reviews/${r.id}/outline`, t('Gliederung erstellt')); } });
+  const write = hasOutline && btn(written ? t('Neu schreiben') : t('Abschnitte schreiben'), { kind: written ? 'secondary' : 'primary', icon: 'edit',
+    disabled: s.outlineDirty || !!job, why: s.outlineDirty ? t('Zuerst die Gliederung speichern.') : t('Es läuft bereits ein Auftrag.'),
+    onClick: () => startJob(`/api/reviews/${r.id}/write`, t('Forschungsstand geschrieben'), { nextTab: 5 }) });
+  const actions = [outline, write, written ? nextBtn(5, t('Weiter: Prüfen')) : null];
+  const body = h('div', { class: 'stack' },
+    h('p', { class: 'muted' }, t('Aus allen Auswertungsblättern entsteht eine thematische Gliederung (nicht Text für Text). Du kannst sie anpassen, bevor die Abschnitte nacheinander geschrieben werden. Jede Aussage wird mit dem Text belegt, aus dem sie stammt. Der fertige Text erscheint unter „Prüfen“.')),
+    hasOutline ? card(t('Gliederung'), 'layers', outlineEditor(r)) : null);
+  return { actions, body };
 }
 
 // Text mit aufgelösten Belegen (Autor Jahr, S. x). Ein Klick auf einen Beleg öffnet eine kleine Auswahl:
@@ -425,43 +507,55 @@ function reviewText(r) {
     } });
 }
 
-function textCard(r, title) {
-  const name = r.title || t('Forschungsstand');
-  return card(title, 'review', reviewText(r), { actions: h('div', { class: 'row nowrap' },
-    iconBtn('copy', t('Text mit Literaturverzeichnis kopieren'), () => copyTarget({ kind: 'review', id: r.id })),
-    btn(t('Exportieren …'), { size: 'sm', kind: 'ghost', icon: 'download', onClick: e => exportMenu(e, { kind: 'review', id: r.id }, name) })) });
+// Hinweise der Prüfung – eingeklappt; die Zusammenfassung nennt, was es zu prüfen gibt
+function checkWarnings(r, c, job) {
+  const docs = Object.fromEntries((r.docs || []).map(d => [d.item_key, d]));
+  const incomplete = c.incomplete_sections || [];
+  const removed = c.removed_docs || [];
+  const parts = [
+    incomplete.length && plural(incomplete.length, t('unvollständiger Abschnitt'), t('unvollständige Abschnitte')),
+    c.unverified_quotes.length && plural(c.unverified_quotes.length, t('unklares Zitat'), t('unklare Zitate')),
+    c.unknown_keys.length && plural(c.unknown_keys.length, t('unbekannter Beleg'), t('unbekannte Belege')),
+    removed.length && plural(removed.length, t('Beleg auf gelöschten Text'), t('Belege auf gelöschte Texte')),
+    c.uncited_docs.length && plural(c.uncited_docs.length, t('ausgewählter Text nicht zitiert'), t('ausgewählte Texte nicht zitiert')),
+  ].filter(Boolean);
+  if (!parts.length) return null;
+  const body = () => h('div', { class: 'stack' },
+    incompleteCard(r, job),
+    c.unknown_keys.length ? notice('error', t('Belege auf Texte, die nicht zur Auswahl gehören: {keys}. Diese Stellen bitte prüfen.', { keys: c.unknown_keys.join(', ') })) : null,
+    removed.length ? notice('warning', t('Belege auf Texte, die in Zotero gelöscht wurden und keine andere Kopie haben: {list}. Die Belege bleiben lesbar, verweisen aber auf keinen Eintrag mehr – Text in Zotero wiederherstellen oder die Stellen anpassen.',
+      { list: removed.map(d => d.title ? `${d.citation} („${d.title}“)` : d.citation).join('; ') })) : null,
+    c.unverified_quotes.length ? h('div', { class: 'stack-sm' }, h('b', null, t('Zitate, die nicht wörtlich im Text gefunden wurden')),
+      c.unverified_quotes.map((q, i) => h('blockquote', { key: i, class: 'quote-check' }, `„${q.quote}“`,
+        q.keys.length ? h('div', { class: 'muted small' }, q.keys.map(k => docs[k] ? docs[k].citation : k).join('; ')) : null)),
+      h('p', { class: 'muted small' }, t('Oft sind es nur Silbentrennungen oder Auslassungen; trotzdem vor der Verwendung mit der PDF vergleichen.'))) : null,
+    c.uncited_docs.length ? h('div', { class: 'stack-sm' }, h('b', null, t('{n} ausgewählte Texte werden im Text nicht zitiert', { n: c.uncited_docs.length })),
+      h('ul', null, c.uncited_docs.map(u => h('li', { key: u.key }, docs[u.key] ? `${docs[u.key].citation}: ${docs[u.key].title}` : u.key)))) : null);
+  return foldCard(`review-warnings-${r.id}`, t('Hinweise der Prüfung'), 'alert', parts.join(' · '), body, { class: 'card-warning' });
 }
 
-function step4(r, job) {
+// 5. Prüfen: Belege und Zitate, der fertige Text, Ausgabe
+function step5(r, job) {
   const c = r.state.check;
-  const docs = Object.fromEntries((r.docs || []).map(d => [d.item_key, d]));
   const name = r.title || t('Forschungsstand');
-  return h('div', { class: 'stack' },
-    job && jobBox(job),
-    c ? h('div', { class: 'stack' },
-      h('div', { class: 'stats-row' },
-        stat(t('Wörter'), fmtInt(c.words)), stat(t('zitierte Texte'), t('{a} von {b}', { a: c.cited_docs, b: c.cited_docs + c.uncited_docs.length })),
-        stat(t('Zitate geprüft'), fmtInt(c.verified_quotes)),
-        stat(t('Zitate unklar'), fmtInt(c.unverified_quotes.length)), stat(t('unbekannte Belege'), fmtInt(c.unknown_keys.length))),
-      incompleteCard(r, job),
-      !c.unverified_quotes.length && !c.unknown_keys.length && !(c.incomplete_sections || []).length && !(c.removed_docs || []).length && notice('success', t('Alle wörtlichen Zitate wurden im Originaltext gefunden; alle Belege verweisen auf ausgewählte Texte.')),
-      c.unknown_keys.length ? notice('error', t('Belege auf Texte, die nicht zur Auswahl gehören: {keys}. Diese Stellen bitte prüfen.', { keys: c.unknown_keys.join(', ') })) : null,
-      (c.removed_docs || []).length ? notice('warning', t('Belege auf Texte, die in Zotero gelöscht wurden und keine andere Kopie haben: {list}. Die Belege bleiben lesbar, verweisen aber auf keinen Eintrag mehr – Text in Zotero wiederherstellen oder die Stellen anpassen.',
-        { list: c.removed_docs.map(d => d.title ? `${d.citation} („${d.title}“)` : d.citation).join('; ') })) : null,
-      c.unverified_quotes.length ? card(t('Zitate, die nicht wörtlich im Text gefunden wurden'), 'quote', h('div', { class: 'stack-sm' },
-        c.unverified_quotes.map((q, i) => h('blockquote', { key: i, class: 'quote-check' }, `„${q.quote}“`,
-          q.keys.length ? h('div', { class: 'muted small' }, q.keys.map(k => docs[k] ? docs[k].citation : k).join('; ')) : null)),
-        h('p', { class: 'muted small' }, t('Oft sind es nur Silbentrennungen oder Auslassungen; trotzdem vor der Verwendung mit der PDF vergleichen.')))) : null,
-      c.uncited_docs.length ? h('details', { class: 'fold-plain' }, h('summary', null, t('{n} ausgewählte Texte werden im Text nicht zitiert', { n: c.uncited_docs.length })),
-        h('ul', null, c.uncited_docs.map(u => h('li', { key: u.key }, docs[u.key] ? `${docs[u.key].citation}: ${docs[u.key].title}` : u.key)))) : null)
+  const actions = [
+    btn(t('Erneut prüfen'), { kind: 'ghost', icon: 'refresh', disabled: !!job, onClick: async () => { await run(() => api.post(`/api/reviews/${r.id}/check`)); openReview(r.id, { keepTab: true }); } }),
+    btn(t('Als Notiz in Zotero'), { icon: 'zotero', onClick: async () => { await run(() => api.post(`/api/reviews/${r.id}/save-to-zotero`)); toast(t('Als eigenständige Notiz in Zotero gespeichert'), 'success'); } }),
+    btn(t('Kopieren'), { icon: 'copy', onClick: () => copyTarget({ kind: 'review', id: r.id }) }),
+    btn(t('Exportieren …'), { kind: 'primary', icon: 'download', onClick: e => exportMenu(e, { kind: 'review', id: r.id }, name) }),
+  ];
+  const clean = c && !c.unverified_quotes.length && !c.unknown_keys.length && !(c.incomplete_sections || []).length && !(c.removed_docs || []).length;
+  const body = h('div', { class: 'stack' },
+    c ? h('div', { class: 'stats-row' },
+      stat(t('Wörter'), fmtInt(c.words)), stat(t('zitierte Texte'), t('{a} von {b}', { a: c.cited_docs, b: c.cited_docs + c.uncited_docs.length })),
+      stat(t('Zitate geprüft'), fmtInt(c.verified_quotes)),
+      stat(t('Zitate unklar'), fmtInt(c.unverified_quotes.length)), stat(t('unbekannte Belege'), fmtInt(c.unknown_keys.length)))
       : h('p', { class: 'muted' }, t('Noch nicht geprüft.')),
-    h('div', { class: 'row wrap end' },
-      btn(t('Erneut prüfen'), { size: 'sm', kind: 'ghost', icon: 'refresh', onClick: async () => { await run(() => api.post(`/api/reviews/${r.id}/check`)); openReview(r.id, { keepTab: true }); } }),
-      btn(t('Als Notiz in Zotero'), { icon: 'zotero', onClick: async () => { await run(() => api.post(`/api/reviews/${r.id}/save-to-zotero`)); toast(t('Als eigenständige Notiz in Zotero gespeichert'), 'success'); } }),
-      btn(t('Kopieren'), { icon: 'copy', onClick: () => copyTarget({ kind: 'review', id: r.id }) }),
-      btn(t('Exportieren …'), { kind: 'primary', icon: 'download', onClick: e => exportMenu(e, { kind: 'review', id: r.id }, name) })),
-    h('p', { class: 'muted small' }, t('Word: Belege und Literaturverzeichnis sind Zotero-Felder – mit dem Zotero-Plugin für Word weiter bearbeitbar. LaTeX: eine übersetzbare Datei mit eingebetteter Literaturdatenbank. Alle Formate enthalten am Ende die „Methode der Literatursuche“: durchsuchte Korpora, Suchanfragen und ihre Treffer.')),
-    textCard(r, t('Text')));
+    clean ? notice('success', t('Alle wörtlichen Zitate wurden im Originaltext gefunden; alle Belege verweisen auf ausgewählte Texte.')) : null,
+    c ? checkWarnings(r, c, job) : null,
+    card(t('Text'), 'review', reviewText(r)),
+    h('p', { class: 'muted small' }, t('Word: Belege und Literaturverzeichnis sind Zotero-Felder – mit dem Zotero-Plugin für Word weiter bearbeitbar. LaTeX: eine übersetzbare Datei mit eingebetteter Literaturdatenbank. Alle Formate enthalten am Ende die „Methode der Literatursuche“: durchsuchte Korpora, Suchanfragen und ihre Treffer.')));
+  return { actions, body };
 }
 
 function titleEditor(r) {
@@ -488,19 +582,26 @@ function reviewDetail() {
   const r = s.review;
   if (s.loading && !r) return h('div', { class: 'center-pad' }, spinner(20));
   if (!r) return null;
-  const reached = STEP_OF[r.state.step] || 1;
+  const reached = reachedOf(r);
   const active = Math.min(s.tab || reached, reached);
   const job = currentJob() || (runningJob('review') && s.jobId == null ? runningJob('review') : null);
   const names = corpusIds(r).map(id => (state.corpora.find(c => c.id === id) || { name: t('gelöschter Korpus') }).name);
   if (job && !s.jobId) { s.jobId = job.id; watchJob(job.id).then(() => { s.jobId = null; openReview(r.id, { keepTab: true }); }); }
+  const { actions, body } = [step1, step2, step3, step4, step5][active - 1](r, job);
   return h('div', { class: 'review-detail' },
-    h('div', { class: 'review-head' },
+    stepper(r, active),
+    h('div', { class: 'review-bar' },
+      h('button', { type: 'button', class: 'prompt-toggle', 'aria-expanded': s.promptOpen ? 'true' : 'false', title: s.promptOpen ? undefined : r.question,
+        onclick: () => { s.promptOpen = !s.promptOpen; if (!s.promptOpen) s.editTitle = null; update(); } },
+      icon(s.promptOpen ? 'chevronDown' : 'chevronRight', 14), h('b', null, t('Prompt')), !s.promptOpen && h('span', { class: 'prompt-peek' }, r.question)),
+      h('div', { class: 'review-actions' }, actions)),
+    s.promptOpen && h('div', { class: 'review-prompt' },
       titleEditor(r),
       h('p', { class: 'review-question' }, r.question),
       h('div', { class: 'row wrap small muted' }, icon('corpus', 14), names.length ? names.join(', ') : t('keine Korpora gewählt'), h('span', null, '·'),
         r.state.language ? languageName(r.state.language) : '', h('span', null, '·'), t('ca. {n} Wörter', { n: fmtInt(r.state.target_words) }))),
-    stepper(r, active),
-    h('div', { class: 'review-step' }, [step1, step2, step3, step4][active - 1](r, job)));
+    job && jobBox(job),
+    h('div', { class: 'review-step', key: active }, body));
 }
 
 export function reviewView() {

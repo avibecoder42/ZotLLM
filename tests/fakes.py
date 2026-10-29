@@ -52,6 +52,35 @@ def make_pdf(path: Path, pages: list[str], first_page: int | None = 1, header: s
     return path
 
 
+# Kleiner Ausschnitt des Zotero-Schemas (GET /api/schema): eine Standardart, zwei Arten mit Beispiel, eine neue ohne
+SCHEMA = {
+    "version": 44,
+    "itemTypes": [
+        {"itemType": "book", "fields": [{"field": "title"}, {"field": "date"}], "creatorTypes": [{"creatorType": "author", "primary": True}]},
+        {"itemType": "case", "fields": [{"field": "caseName", "baseField": "title"}, {"field": "court", "baseField": "authority"},
+                                        {"field": "dateDecided", "baseField": "date"}, {"field": "reporter"},
+                                        {"field": "reporterVolume", "baseField": "volume"}, {"field": "firstPage", "baseField": "pages"}],
+         "creatorTypes": [{"creatorType": "author", "primary": True}, {"creatorType": "counsel"}]},
+        {"itemType": "artwork", "fields": [{"field": "title"}, {"field": "artworkMedium", "baseField": "medium"}, {"field": "date"},
+                                           {"field": "archive"}, {"field": "artworkSize"}],
+         "creatorTypes": [{"creatorType": "artist", "primary": True}, {"creatorType": "contributor"}]},
+        {"itemType": "hologram", "fields": [{"field": "title"}, {"field": "date"}, {"field": "studio", "baseField": "publisher"}],
+         "creatorTypes": [{"creatorType": "holographer", "primary": True}]},
+        {"itemType": "note", "fields": [], "creatorTypes": []},
+    ],
+    "csl": {
+        "types": {"book": ["book"], "legal_case": ["case"], "graphic": ["artwork"]},
+        "fields": {"text": {"title": ["title"], "container-title": ["publicationTitle", "reporter"], "authority": ["authority"],
+                            "volume": ["volume"], "page": ["pages"], "medium": ["medium"], "archive": ["archive"],
+                            "publisher": ["publisher"], "dimensions": ["artworkSize"]},
+                   "date": {"issued": "date"}},
+        "names": {"author": "author", "contributor": "contributor"},
+    },
+    "locales": {"de": {"itemTypes": {"book": "Buch", "case": "Gerichtsentscheidung", "artwork": "Kunstwerk", "hologram": "Hologramm"}},
+                "en-US": {"itemTypes": {"book": "Book", "case": "Case", "artwork": "Artwork", "hologram": "Hologram"}}},
+}
+
+
 class FakeZotero:
     """Minimaler Nachbau der lokalen Zotero-10-API (Lesen + Schreiben)."""
 
@@ -72,6 +101,7 @@ class FakeZotero:
         self.plugin = True  # ZotLLM-Plugin installiert (Schnittstelle /zotllm/uris)
         self.plugin_version = (0, 10)  # ab 0.10: Stile installieren (/zotllm/styles/install)
         self.installed_styles: dict[str, str] = {}
+        self.schema = SCHEMA
         self.writes: list[dict] = []
         self.json_item_requests = 0  # Anfragen mit vollem JSON (lösen in Zotero MD5-Berechnungen aus)
         self._next = 0
@@ -167,6 +197,8 @@ class FakeZotero:
             return httpx.Response(200, text="Zotero is running", headers={"X-Zotero-Version": "10.0.5"})
         if path == "/api/":
             return self._resp(200, text="Nothing to see here.")
+        if path == "/api/schema":
+            return self._resp(200, self.schema)
         if request.method != "GET":
             # Wie Zotero 10 (LocalAPIEndpoint._validateServerID): jede schreibende Anfrage braucht die Server-ID
             sid = request.headers.get("Zotero-Server-ID")
@@ -182,7 +214,7 @@ class FakeZotero:
             return self._resp(200, {"uris": {r: f"http://zotero.org/users/local/abcd1234/items/{r.split(':')[1]}"
                                              for r in refs}})
         if path == "/zotllm/styles/install":
-            # Plugin ab 0.10.0: eigenen Stil installieren (nur mit X-ZotLLM und ZotLLM-Kennung, wie im Plugin)
+            # Plugin ab 1.0.0: eigenen Stil installieren (nur mit X-ZotLLM und ZotLLM-Kennung, wie im Plugin)
             if not self.plugin or self.plugin_version < (0, 10):
                 return self._resp(404, text="No endpoint found")
             if request.headers.get("X-ZotLLM") != "1":

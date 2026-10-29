@@ -114,14 +114,15 @@ class StyleInfo:
     format: str  # author-date, numeric, note, author, label
     file: Path
     parent: str | None = None  # abhängiger Stil: ID des eigenständigen Stils
+    short: str = ""  # Kurztitel, z. B. „Schreibberatung PH FHNW (Empfehlungen)“
 
     @property
     def supported(self) -> bool:
         return self.format != "note"  # Fussnotenstile: Belege müssten Fussnoten werden
 
     def as_dict(self) -> dict:
-        return {"id": self.id, "title": self.title, "format": self.format, "dependent": bool(self.parent),
-                "supported": self.supported}
+        return {"id": self.id, "title": self.title, "short": self.short, "format": self.format,
+                "dependent": bool(self.parent), "supported": self.supported}
 
 
 _cache: dict[str, tuple[tuple, list[StyleInfo]]] = {}
@@ -139,7 +140,8 @@ def _info(path: Path) -> StyleInfo | None:
     title = (info.findtext(f"{_NS}title") or path.stem).strip()
     fmt = next((c.get("citation-format") for c in info.findall(f"{_NS}category") if c.get("citation-format")), "")
     parent = next((ln.get("href") for ln in info.findall(f"{_NS}link") if ln.get("rel") == "independent-parent"), None)
-    return StyleInfo(id=sid, title=title, format=fmt or "author-date", file=path, parent=parent) if sid else None
+    short = (info.findtext(f"{_NS}title-short") or "").strip()
+    return StyleInfo(id=sid, title=title, format=fmt or "author-date", file=path, parent=parent, short=short) if sid else None
 
 
 def installed_styles(data_dir: Path | None) -> list[StyleInfo]:

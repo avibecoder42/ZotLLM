@@ -26,7 +26,8 @@ COMMA = HEAD.format(cls="in-text", title="Komma-Stil", id="test-comma", extra=""
     <names variable="author"><name form="short"/></names><date variable="issued"><date-part name="year"/></date>
     <group><label variable="locator" form="short" suffix=" "/><text variable="locator"/></group>
   </group></layout></citation></style>"""
-NOTE = HEAD.format(cls="note", title="Fussnoten-Stil", id="test-note", extra="", fmt="note") + \
+NOTE = HEAD.format(cls="note", title="Fussnoten-Stil", id="test-note", extra="<title-short>FN kurz</title-short>",
+                   fmt="note") + \
     "<citation><layout><text variable=\"title\"/></layout></citation></style>"
 DEPENDENT = HEAD.format(cls="in-text", title="Abhängig vom Doppelpunkt-Stil", id="test-dependent",
                         extra='<link href="http://www.zotero.org/styles/test-colon" rel="independent-parent"/>',
@@ -53,7 +54,8 @@ def test_installed_styles_and_locator_analysis(tmp_path):
     styles = zstyles.installed_styles(data)
     assert [s.title for s in styles] == ["Abhängig vom Doppelpunkt-Stil", "Doppelpunkt-Stil", "Fussnoten-Stil",
                                          "Komma-Stil"]
-    assert not next(s for s in styles if s.format == "note").supported
+    note = next(s for s in styles if s.format == "note")
+    assert not note.supported and note.as_dict()["short"] == "FN kurz"  # Kurztitel für den Filter im CSL-Editor
     colon = zstyles.analyze_locator(zstyles.style_xml("test-colon", data))
     assert colon.found and colon.no_page_mode == "locator" and colon.delimiter == ": " and not colon.label
     assert zstyles.preview(colon, "de", NO_PAGE) == {"page": "(Gillingham 2019: 114)", "no_page": "(Gillingham 2019: o. S.)"}

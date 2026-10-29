@@ -1352,6 +1352,60 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
         zstyles._cache.clear()
         return {"installed": True, "id": csl.info(xml)["id"]}
 
+    @app.get("/api/csl/item-types")
+    def csl_item_types(lang: str = "de"):
+        """Weitere Eintragsarten für die Vorschau: Liste, Namen und Feldzuordnung aus Zotero, Beispiele aus ZotLLM."""
+        from zotllm import csl_types
+
+        schema, source = csl_types.load_schema(engine.zotero())
+        if not schema:
+            return {"types": [], "source": ""}
+        return {"types": csl_types.sample_types(schema, lang), "source": source}
+
+    @app.post("/api/csl/library-examples")
+    def csl_library_examples(body: dict = Body(...)):
+        """Beispiele der Vorschau aus der eigenen Bibliothek: je Beispiel der vollständigste passende Eintrag."""
+        from zotllm import csl_types
+        from zotllm.exporting import Citations
+
+        picks = csl_types.pick_library_items(engine.store, [str(x) for x in (body.get("examples") or [])][:60])
+        if not picks:
+            return {"items": {}}
+        keys = list(dict.fromkeys(picks.values()))
+        cites = Citations(engine, keys, engine.settings.citation_style, engine.settings.language)
+        out = {}
+        for ex, k in picks.items():
+            item = dict(cites.csl.get(k) or {})
+            if item:
+                item["id"] = f"lib:{ex}"
+                out[ex] = {"item": item, "ref": f"{k[0]}:{k[1]}", "title": (cites.items.get(k) or {}).get("title", "")}
+        return {"items": out}
+
+    @app.post("/api/csl/collection-examples")
+    def csl_collection_examples(body: dict = Body(...)):
+        """Einträge einer Sammlung (mit Untersammlungen) als Beispiele der Vorschau: nach Eintragsart und Titel, höchstens 40."""
+        from zotllm import csl_types
+        from zotllm.exporting import Citations
+
+        source = str(body.get("collection") or "")
+        if ":" not in source or source.endswith(":*"):
+            raise HTTPException(400, "Bitte eine Sammlung wählen.")
+        items = engine.store.items(indexer.scope(collections=[source], resolve=False))
+        keys = sorted(items, key=lambda k: (items[k].get("item_type") or "", (items[k].get("title") or "").casefold()))
+        if not keys:
+            return {"items": [], "total": 0}
+        names = csl_types.type_names(csl_types.load_schema(engine.zotero())[0], body.get("lang") or "de")
+        cites = Citations(engine, keys[:40], engine.settings.citation_style, engine.settings.language)
+        out = []
+        for k in keys[:40]:
+            item = dict(cites.csl.get(k) or {})
+            if item:
+                item["id"] = f"c:{k[0]}:{k[1]}"
+                itype = items[k].get("item_type") or ""
+                out.append({"ref": f"{k[0]}:{k[1]}", "label": names.get(itype) or itype, "title": items[k].get("title") or "",
+                            "item": item})
+        return {"items": out, "total": len(keys)}
+
     @app.post("/api/csl/items")
     def csl_items(body: dict = Body(...)):
         """Eigene Zotero-Einträge als CSL-JSON für die Vorschau (aus Zotero, sonst aus den gespeicherten Angaben)."""
@@ -1796,6 +1850,20 @@ def create_app(engine: Engine | None = None, on_exit=None, exit_after_minutes: i
         _review(rid)
         return job_or_409("review", "Forschungsstand: Auswertungsblätter", lambda job: reviews.extract(job, rid),
                           group="review")
+
+    @app.get("/api/sheets")
+    def sheet_get(lib: str, key: str):
+        sheet = reviews.sheet_view(lib, key)
+        if sheet is None:
+            raise HTTPException(404, "Kein Auswertungsblatt für diesen Text")
+        return sheet
+
+    @app.post("/api/reviews/{rid}/sheets/rebuild")
+    def review_rebuild_sheet(rid: int, body: dict = Body(...)):
+        _review(rid)
+        lib, key = body["lib"], body["item_key"]
+        return job_or_409("review", "Forschungsstand: Auswertungsblatt neu erstellen",
+                          lambda job: reviews.rebuild_sheet(job, rid, lib, key), group="review")
 
     @app.post("/api/reviews/{rid}/outline")
     def review_outline(rid: int):

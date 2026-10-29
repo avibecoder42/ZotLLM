@@ -90,7 +90,7 @@ def test_review_full_flow(indexed, monkeypatch, fake_zotero):
         ("Entscheide für jeden Text", screen),
     ])
     main = ScriptedModel([
-        ("Auswertungsblatt in diesem JSON-Format", json.dumps(sheet)),
+        ("Auswertungsblatt in diesem JSON-Format", lambda prompt: json.dumps(sheet)),
         ("Entwirf eine Gliederung", json.dumps(outline)),
         ("Schreibe jetzt den Abschnitt „Einleitung“", "## Einleitung\n\nChatbots werden genutzt [@ITEMA001]."),
         ("Schreibe jetzt den Abschnitt „Befunde“",
@@ -123,6 +123,21 @@ def test_review_full_flow(indexed, monkeypatch, fake_zotero):
     assert "Kernzitate" in fake_zotero.items[note_key]["data"]["note"]
     # Seitenmarkierungen im Text an das Modell
     assert "[S. 1]" in next(c for c in main.calls if "Auswertungsblatt in diesem" in c)
+    # Anzeige des Blatts: Felder ohne interne Angaben, Kernzitat mit Link auf die PDF-Seite, Notiz in Zotero
+    view = svc.sheet_view("users/0", "ITEMA001")
+    assert view["sheet"]["methode"] == "Befragung" and not any(k.startswith("_") for k in view["sheet"])
+    assert view["quotes"] == [{"zitat": "emotionale Unterstützung das wichtigste Motiv ist", "seite": "1",
+                               "url": "zotero://open-pdf/library/items/ATTA0001?page=1"}]
+    assert view["note_select"] == f"zotero://select/library/items/{note_key}" and view["basis"] == "Volltext"
+    # Ein einzelnes Blatt neu erstellen: ersetzt Blatt und Notiz, der Schritt des Forschungsstands bleibt
+    sheet["kurzbeschreibung"] = "Neu gelesen."
+    svc.rebuild_sheet(Job("review", "t"), rid, "users/0", "ITEMA001")
+    assert svc.sheet_view("users/0", "ITEMA001")["sheet"]["kurzbeschreibung"] == "Neu gelesen."
+    assert indexed.store.get_sheet("users/0", "ITEMA001")["note_key"] == note_key
+    assert "Neu gelesen." in fake_zotero.items[note_key]["data"]["note"]
+    assert svc.get(rid)["state"]["step"] == "extracted"
+    with pytest.raises(ValueError):  # ohne vorhandenes Blatt: dafür gibt es „Fehlende Blätter erstellen“
+        svc.rebuild_sheet(Job("review", "t"), rid, "users/0", "ITEMB001")
 
     svc.outline(Job("review", "t"), rid)
     svc.write(Job("review", "t"), rid)

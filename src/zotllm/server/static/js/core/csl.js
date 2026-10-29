@@ -262,6 +262,77 @@ export function macroUses(doc, name, seen = new Set()) {
   return n;
 }
 
+// Aus welchen Teilen (citation, bibliography) ein Makro ausgegeben wird – auch über andere Makros: { name: Set }
+export function macroAreas(doc) {
+  const callees = {};
+  for (const m of doc.getElementsByTagNameNS(NS, 'macro')) {
+    callees[m.getAttribute('name')] = [...m.getElementsByTagNameNS(NS, 'text')].map(c => c.getAttribute('macro')).filter(Boolean);
+  }
+  const areas = {};
+  const visit = (name, area, seen) => {
+    if (seen.has(name) || !(name in callees)) return;
+    seen.add(name);
+    (areas[name] = areas[name] || new Set()).add(area);
+    for (const c of callees[name]) visit(c, area, seen);
+  };
+  for (const area of ['citation', 'bibliography']) {
+    const root = doc.getElementsByTagNameNS(NS, area)[0];
+    if (!root) continue;
+    const seen = new Set();
+    for (const c of root.getElementsByTagNameNS(NS, 'text')) if (c.getAttribute('macro')) visit(c.getAttribute('macro'), area, seen);
+  }
+  return areas;
+}
+
+export const isShared = (areas, name) => !!areas[name] && areas[name].size === 2;
+
+// Änderung nur im Text bzw. nur im Verzeichnis: Das Makro und alle gemeinsam genutzten Makros, über die dieser Teil
+// es erreicht, bekommen für ihn eine Kopie („…-bibliography“ bzw. „…-citation“); seine Aufrufe (auch Sortierschlüssel)
+// zeigen danach auf die Kopien, der andere Teil verwendet weiter die Originale.
+// Rückgabe: Zuordnung Original-Element → Element in der Kopie, oder null, wenn das Makro nicht geteilt ist.
+export function separateMacro(doc, name, area) {
+  const areas = macroAreas(doc);
+  if (!isShared(areas, name)) return null;
+  const macros = {};
+  for (const m of doc.getElementsByTagNameNS(NS, 'macro')) macros[m.getAttribute('name')] = m;
+  const calls = () => [...doc.getElementsByTagNameNS(NS, 'text'), ...doc.getElementsByTagNameNS(NS, 'key')].filter(c => c.getAttribute('macro'));
+  // Gemeinsam genutzte Aufrufer gehören dazu, sonst bliebe die Kopie über sie unerreichbar
+  const copy = new Set([name]);
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const c of calls()) {
+      const { macro: ctx } = context(c);
+      if (copy.has(c.getAttribute('macro')) && ctx && isShared(areas, ctx) && !copy.has(ctx)) { copy.add(ctx); grew = true; }
+    }
+  }
+  const suffix = area === 'bibliography' ? 'bibliography' : 'citation';
+  const names = {};
+  const map = new Map();
+  const taken = new Set(Object.keys(macros));
+  for (const n of copy) {
+    const orig = macros[n];
+    let nn = `${n}-${suffix}`;
+    for (let i = 2; taken.has(nn); i++) nn = `${n}-${suffix}-${i}`;
+    taken.add(nn);
+    names[n] = nn;
+    const dup = orig.cloneNode(true);
+    dup.setAttribute('name', nn);
+    insertAfter(orig, dup);
+    const a = [orig, ...orig.getElementsByTagNameNS(NS, '*')];
+    const b = [dup, ...dup.getElementsByTagNameNS(NS, '*')];
+    a.forEach((x, i) => map.set(x, b[i]));
+  }
+  const copies = new Set(Object.values(names));
+  const only = ctx => copies.has(ctx) || (areas[ctx] && areas[ctx].size === 1 && areas[ctx].has(area));
+  for (const c of calls()) {
+    const target = names[c.getAttribute('macro')];
+    if (!target) continue;
+    const { macro: ctx, area: a } = context(c);
+    if (ctx ? only(ctx) : a === area) c.setAttribute('macro', target);
+  }
+  return map;
+}
+
 export function createElement(doc, tag, attrs = {}) {
   const el = doc.createElementNS(NS, tag);
   for (const [k, v] of Object.entries(attrs)) if (v !== undefined && v !== null && v !== '') el.setAttribute(k, v);
@@ -275,13 +346,63 @@ export function siblingElement(el, dir) {
   return s;
 }
 
+// Verschieben: mit dem Nachbarn tauschen; am Rand einer Gruppe verlässt das Element sie (davor bzw. danach).
+// Bedingungen, Bausteine, Datum, Namen und das Layout verlässt es nicht.
+export function canMove(el, dir) {
+  return !!siblingElement(el, dir) || el.parentNode.localName === 'group';
+}
+
 export function moveElement(el, dir) {
   const other = siblingElement(el, dir);
-  if (!other) return false;
   const parent = el.parentNode;
-  if (dir < 0) parent.insertBefore(el, other);
-  else parent.insertBefore(el, other.nextSibling);
+  if (other) parent.insertBefore(el, dir < 0 ? other : other.nextSibling);
+  else if (parent.localName === 'group') parent.parentNode.insertBefore(el, dir < 0 ? parent : parent.nextSibling);
+  else return false;
   return true;
+}
+
+// Ganz nach vorne bzw. hinten: an den Anfang bzw. das Ende der äussersten Gruppe, in der das Element steht
+function edgeBox(el) {
+  let box = el.parentNode;
+  while (box.localName === 'group' && box.parentNode.localName === 'group') box = box.parentNode;
+  const kids = [...box.children];
+  return { box, first: kids[0], last: kids[kids.length - 1] };
+}
+
+export function canMoveToEdge(el, dir) {
+  const { first, last } = edgeBox(el);
+  return (dir < 0 ? first : last) !== el;
+}
+
+export function moveToEdge(el, dir) {
+  const { box, first, last } = edgeBox(el);
+  if ((dir < 0 ? first : last) === el) return false;
+  box.insertBefore(el, dir < 0 ? first : last.nextSibling);
+  return true;
+}
+
+// Weg zu einem angeklickten Teil über die Aufrufe der Bausteine: Text bzw. Verzeichnis › … › Aufruf eines Bausteins ›
+// … im Baustein › … › Teil. path: Elemente aus der Zuordnung (aussen → innen); passt er nicht zur Struktur: null.
+export function pathChain(path) {
+  if (!path || !path.length) return null;
+  const last = path[path.length - 1];
+  const ends = path.filter(p => p.localName === 'text' && p.getAttribute('macro'));
+  if (ends[ends.length - 1] !== last) ends.push(last);
+  const out = [];
+  let macro = null;
+  for (const end of ends) {
+    const seg = [];
+    let p = end;
+    for (; p && p.nodeType === 1; p = p.parentNode) {
+      seg.unshift(p);
+      if (macro ? p.localName === 'macro' && p.getAttribute('name') === macro : p.localName === 'citation' || p.localName === 'bibliography') break;
+    }
+    if (!p || p.nodeType !== 1) return null;
+    if (macro) seg.shift();  // das Makro selbst nicht – sein Aufruf steht schon davor
+    out.push(...seg);
+    macro = end.getAttribute('macro');
+  }
+  return out;
 }
 
 export function removeElement(el) {

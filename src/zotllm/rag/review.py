@@ -29,7 +29,7 @@ from zotllm.index.store import SearchFilter, strip_bidi
 from zotllm.jobs import Job
 from zotllm.llm import (ChatMessage, ChatModel, GenParams, LLMError, helper_model, main_model,
                            retry_after_truncation, truncation)
-from zotllm.rag.markdown import md_to_html
+from zotllm.rag.markdown import latex_to_text, md_to_html
 from zotllm.rag.prompts import LANG_NAMES
 from zotllm.rag.sources import _merge_overlapping, author_year
 from zotllm.retrieval import Searcher
@@ -100,7 +100,9 @@ Regeln:
 - Verwende ausschliesslich Informationen aus den Auswertungsblättern. Nichts erfinden, keine externen Studien.
 - Belege jede inhaltliche Aussage mit dem Schlüssel des Textes im Format [@SCHLÜSSEL] oder mit Seite [@SCHLÜSSEL, S. 12]. Mehrere Belege: [@KEY1; @KEY2].
 - Wörtliche Zitate nur aus den "kernzitate" der Blätter, exakt und mit deren Seitenangabe. Steht dort als Seite „o. S.“ (Quelle ohne Seitenzahlen), belege mit [@SCHLÜSSEL, o. S.].
+- Nennst du Autorinnen oder Autoren im Satz, setze den Beleg direkt dahinter: „Shin et al. [@SCHLÜSSEL] zeigen …“ (der Beleg nennt dann nur Jahr und Seite).
 - Synthetisiere: vergleiche, gruppiere, benenne Widersprüche und methodische Unterschiede, statt Studien nacheinander nachzuerzählen.
+- Kein LaTeX und keine Formelschreibweise (kein $…$, kein \\beta, \\ge, \\text): Kennwerte als normaler Text mit Unicode-Zeichen, z. B. β = .35, r = −.14, N = 7 450, ≥ 21, I² = 63 %.
 - Wissenschaftlicher, sachlicher Stil. Markdown. Schreibe nur den angeforderten Abschnitt mit seiner Überschrift (##).
 
 Auswertungsblätter (Schlüssel in eckigen Klammern):
@@ -193,6 +195,19 @@ def parse_citation(group: str) -> list[tuple[str, str]]:
             page = m.group(2).strip().rstrip(".")
             out.append((m.group(1).upper(), NO_PAGE if _NO_PAGE_RE.match(page) else page))
     return out
+
+
+_NAME_TAIL = r"(?:\s+(?:et\s+al\.|u\.\s?a\.)|(?:\s*,\s*[^\s,\[\]]+)*,?\s+(?:and|und|&)\s+[^\s,\[\]]+)?"
+
+
+def named_before(before: str, item: dict) -> bool:
+    """Steht die erste Autorin bzw. der erste Autor direkt vor dem Beleg („Shin et al. [@KEY]“, „Shin und Kim [@KEY]“)?
+    Dann nennt der Beleg nur Jahr und Seite (in Zotero: suppress-author) – sonst stünde der Name doppelt da."""
+    creators = item.get("creators") or []
+    first = next((c for role in ("author", "editor", None) for c in creators
+                  if role is None or (c.get("creatorType") or "author") == role), None)
+    family = strip_bidi((first or {}).get("lastName") or (first or {}).get("name") or "").strip()
+    return bool(family) and bool(re.search(r"(?<![\w-])" + re.escape(family) + _NAME_TAIL + r"\s*$", before[-200:]))
 
 
 def format_citation(parts: list[tuple[str, str]]) -> str:
@@ -631,10 +646,8 @@ class ReviewService:
                 page = str(q.get("seite", "")).strip()
                 shown = page if page == NO_PAGE else f"S. {page}"
                 link = ""
-                if pdf and page:
-                    pdf_page = q.get("pdf_seite")
-                    idx = int(pdf_page) - 1 if str(pdf_page or "").isdigit() else self._page_index(lib, item_key, page)
-                    url = zotero_open_pdf_url(lib, pdf["key"], idx)
+                url = self._quote_url(lib, item_key, pdf, q)
+                if url:
                     link = f' (<a href="{e(url)}">{e(shown)}</a>)'
                 elif page:
                     link = f" ({e(shown)})"
@@ -642,6 +655,31 @@ class ReviewService:
         if sheet.get("stichworte"):
             rows.append(f"<p><strong>Stichworte:</strong> {e(', '.join(map(str, sheet['stichworte'])))}</p>")
         return "\n".join(rows)
+
+    def _quote_url(self, lib: str, item_key: str, pdf: dict | None, q: dict) -> str | None:
+        """Link auf die Seite eines Kernzitats in der PDF: die gefundene Dateiseite, sonst aus der Seitenangabe."""
+        page = str(q.get("seite", "")).strip()
+        if not pdf or not page:
+            return None
+        pdf_page = q.get("pdf_seite")
+        idx = int(pdf_page) - 1 if str(pdf_page or "").isdigit() else self._page_index(lib, item_key, page)
+        return zotero_open_pdf_url(lib, pdf["key"], idx)
+
+    def sheet_view(self, lib: str, item_key: str) -> dict | None:
+        """Auswertungsblatt zur Anzeige: Felder ohne interne Angaben, Kernzitate mit Link auf die PDF-Seite,
+        Modell, Grundlage und – falls gespeichert – die Notiz in Zotero."""
+        row = self.ensure_sheet_pages(lib, item_key)
+        if not row:
+            return None
+        sheet = row["sheet"]
+        pdf = self._pdf_attachment(lib, item_key)
+        quotes = [{"zitat": str(q.get("zitat", "")), "seite": str(q.get("seite", "")).strip(),
+                   "url": self._quote_url(lib, item_key, pdf, q)}
+                  for q in sheet.get("kernzitate") or [] if isinstance(q, dict)]
+        return {"lib": lib, "item_key": item_key, "quotes": quotes,
+                "sheet": {k: v for k, v in sheet.items() if not k.startswith("_") and k != "kernzitate"},
+                "basis": sheet.get("_basis", ""), "model": row.get("model") or "", "created_at": row.get("created_at"),
+                "note_select": zotero_select_url(lib, row["note_key"]) if row.get("note_key") else None}
 
     def _page_index(self, lib: str, item_key: str, label: str) -> int | None:
         """Seitenangabe eines Belegs („12“, „12–14“, „1, 9“, „12f.“, „xii“) → Seite in der PDF (0-basiert).
@@ -972,6 +1010,7 @@ class ReviewService:
                     if job.cancelled:
                         break
                     result["errors"] += 1
+                    result["error"] = str(e)
                     job.note(f"Auswertung fehlgeschlagen: {e}")
                     job.step()
                     continue
@@ -1042,6 +1081,21 @@ class ReviewService:
         state["step"] = "extracted"
         self.store.update_review_state(review_id, state)
         job.update(phase="Fertig", message=f"{res['created']} Blätter erstellt, {res['notes']} Notizen in Zotero")
+        return res
+
+    def rebuild_sheet(self, job: Job, review_id: int, lib: str, item_key: str) -> dict:
+        """Ein einzelnes Auswertungsblatt neu erstellen (etwa ein schwaches); der übrige Forschungsstand bleibt."""
+        review = self.store.get_review(review_id)
+        if not review:
+            raise KeyError(review_id)
+        if not self.store.get_sheet(lib, item_key):
+            raise ValueError("Für diesen Text gibt es noch kein Auswertungsblatt.")
+        state = review["state"]
+        res = self.build_sheets(job, [(lib, item_key)], focus=state.get("queries") or [review["question"]],
+                                overwrite=True, language=state.get("language"))
+        if not res["created"]:
+            raise ValueError(f"Auswertungsblatt nicht neu erstellt: {res.get('error') or '?'}")
+        job.update(phase="Fertig", message="Auswertungsblatt neu erstellt")
         return res
 
     # ------------------------------------------------------------------------------
@@ -1282,7 +1336,7 @@ class ReviewService:
         if target == "dialog" and cites is None:
             cites = []
         title = (state.get("outline") or {}).get("title") or review["title"]
-        text = "\n\n".join(s["text"] for s in state.get("sections", []))
+        text = latex_to_text("\n\n".join(s["text"] for s in state.get("sections", [])))
         lang = state.get("language") or "de"
         page_prefix = "S." if lang == "de" else "p."  # Seitenangabe in der Sprache des Forschungsstands
         # Belege ohne Seitenangabe: Link auf die Seite, auf der die belegte Aussage steht (im Text bleibt „Autor Jahr“)
@@ -1299,7 +1353,7 @@ class ReviewService:
             if not parsed:
                 return m.group(0)
             ctx = None
-            for key, page in parsed:
+            for i, (key, page) in enumerate(parsed):
                 d = docs.get(key)
                 if not d:
                     out.append(f"[?{key}]")
@@ -1308,7 +1362,9 @@ class ReviewService:
                     used.append(key)
                 it = items.get((d["lib"], key), {})
                 no_page = page == NO_PAGE
-                label = author_year(it) + (f", {NO_PAGE}" if no_page else f", {page_prefix} {page}" if page else "")
+                # „Shin et al. [@KEY]“: der Name steht schon im Satz – der Beleg nennt nur Jahr und Seite
+                who = str(it.get("year") or "o. J.") if i == 0 and named_before(text[:m.start()], it) else author_year(it)
+                label = who + (f", {NO_PAGE}" if no_page else f", {page_prefix} {page}" if page else "")
                 if not with_links:
                     out.append(label)
                     continue

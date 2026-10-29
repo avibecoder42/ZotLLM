@@ -178,6 +178,12 @@ MESSAGES: dict[str, str] = {
     "Für diesen Forschungsstand wurde noch keine Zotero-Sammlung angelegt.":
         "No Zotero collection has been created for this literature review yet.",
     "Ungültiges Auswertungsblatt": "Invalid evaluation sheet",
+    "Kein Auswertungsblatt für diesen Text": "No evaluation sheet for this text",
+    "Forschungsstand: Auswertungsblatt neu erstellen": "Literature review: recreate evaluation sheet",
+    "Für diesen Text gibt es noch kein Auswertungsblatt.": "There is no evaluation sheet for this text yet.",
+    "Auswertungsblatt nicht neu erstellt: {e}": "Evaluation sheet not recreated: {e}",
+    "Auswertungsblatt neu erstellt": "Evaluation sheet recreated",
+    "Auswertung fehlgeschlagen: {e}": "Evaluation failed: {e}",
     "nicht bewertet": "not rated",
     "Kein indexierter Text vorhanden": "No indexed text available",
     # Anhang des Exports (Sprache des Forschungsstands)
@@ -401,7 +407,7 @@ MESSAGES: dict[str, str] = {
     "Keine OpenDocument-Datei (content.xml fehlt)": "Not an OpenDocument file (content.xml is missing)",
     "{name} ist zu gross ({mb} MB entpackt)": "{name} is too large ({mb} MB unpacked)",
 
-    # -- CSL-Editor (0.10.0) ----------------------------------------------------------------------
+    # -- CSL-Editor (1.0.0) -----------------------------------------------------------------------
     "Der Stil ist zu gross.": "The style is too large.",
     "Kein gültiges XML: {e}": "Not valid XML: {e}",
     "Keine CSL-Datei: Das Wurzelelement muss <style> (CSL 1.0) sein.": "Not a CSL file: the root element must be <style> (CSL 1.0).",
@@ -419,7 +425,7 @@ MESSAGES: dict[str, str] = {
     "Für diesen abhängigen Stil fehlt der Elternstil.": "The parent style of this dependent style is missing.",
     "Stil nicht gefunden": "Style not found",
     "Version nicht gefunden": "Version not found",
-    "Für das direkte Installieren braucht es das ZotLLM-Plugin ab Version 0.10.0.":
-        "Installing directly requires the ZotLLM plugin version 0.10.0 or later.",
+    "Für das direkte Installieren braucht es das ZotLLM-Plugin ab Version 1.0.0.":
+        "Installing directly requires the ZotLLM plugin version 1.0.0 or later.",
     "Zotero konnte den Stil nicht installieren: {detail}": "Zotero could not install the style: {detail}",
 }

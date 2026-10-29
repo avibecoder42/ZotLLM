@@ -34,7 +34,8 @@ Modellkatalog. API-Schlüssel liegen verschlüsselt im Schlüsselspeicher des Be
 Schlüsselspeicher und Startskripte sind für macOS und Linux angelegt.
 
 Dazu kommt ein **CSL-Editor**: Zitierstil auf zotero.org suchen, per Klick auf die Vorschau anpassen und direkt in
-Zotero installieren.
+Zotero installieren. Er ist eine erste Version und noch in Entwicklung – Hinweise und Beiträge sind willkommen
+([Issues](https://github.com/avibecoder42/ZotLLM/issues)).
 
 <p align="center"><img src="docs/screenshots/de/ask.png" alt="Fragen: Antwort mit nummerierten Belegen und der zitierten Textstelle"></p>
 <p align="center"><sub>Antworten mit Belegen; ein Klick zeigt die Textstelle mit Seite. Demo-Bibliothek mit erfundenen Quellen.</sub></p>
@@ -254,17 +255,18 @@ werden nicht neu gelesen, nur für das neue Modell eingebettet.
 ## Forschungsstand
 
 Für Fragen wie «Erarbeite den Forschungsstand zu … in 4000 Wörtern» reicht eine einfache Suche nicht. Der Modus
-arbeitet in vier Schritten:
+arbeitet in fünf Schritten:
 
-1. **Texte finden:** Das Hilfsmodell schlägt Suchanfragen vor (Deutsch/Englisch, Synonyme, Fachbegriffe), die man
+1. **Stichworte:** Das Hilfsmodell schlägt Suchanfragen vor (Deutsch/Englisch, Synonyme, Fachbegriffe), die man
    prüft, ändert, ergänzt oder löscht – wie Suchstrings in Literaturdatenbanken. Treffer werden je Dokument gezählt; je
-   Anfrage sieht man, wie viele Texte sie gefunden hat und wie viele *nur* sie. Die Auswahl prüft man selbst, auf Wunsch
+   Anfrage sieht man, wie viele Texte sie gefunden hat und wie viele *nur* sie.
+2. **Literatur auswählen:** Das Hilfsmodell schlägt eine Auswahl mit Begründung vor; man prüft sie selbst, auf Wunsch
    als Zotero-Sammlung.
-2. **Einzeln auswerten:** Für jeden Text entsteht ein Auswertungsblatt (Fragestellung, Theorie, Methode, Stichprobe,
+3. **Einzeln auswerten:** Für jeden Text entsteht ein Auswertungsblatt (Fragestellung, Theorie, Methode, Stichprobe,
    Land, Befunde, Grenzen, Kernzitate mit Seitenzahl) – gespeichert im Index und als Notiz am Zotero-Eintrag. Vor dem
    Start stehen Input-, Output- und Denk-Token und – mit eingetragenen Preisen – die geschätzten Kosten.
-3. **Synthese:** Gliederung (bearbeitbar), dann abschnittsweises Schreiben mit Belegen `[@SCHLÜSSEL, S. x]`.
-4. **Kontrolle:** Jeder Beleg wird gegen die ausgewählten Texte geprüft, wörtliche Zitate gegen den Originaltext;
+4. **Synthese:** Gliederung (bearbeitbar), dann abschnittsweises Schreiben mit Belegen `[@SCHLÜSSEL, S. x]`.
+5. **Kontrolle:** Jeder Beleg wird gegen die ausgewählten Texte geprüft, wörtliche Zitate gegen den Originaltext;
    abgebrochene Abschnitte werden erkannt und lassen sich neu schreiben. Ausgabe als Markdown, Word, LaTeX oder Notiz in
    Zotero, mit einem Anhang zur Methode der Literatursuche (Korpora, Suchanfragen, Treffer).
 

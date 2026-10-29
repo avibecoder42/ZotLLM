@@ -34,7 +34,8 @@ API keys are stored encrypted in the operating system's key store. Runs on Windo
 scripts are prepared for macOS and Linux.
 
 Also included: a **CSL editor** to find a citation style on zotero.org, adapt it by clicking on the preview and install
-it directly in Zotero.
+it directly in Zotero. It is a first version and still in development – feedback and contributions are welcome
+([issues](https://github.com/avibecoder42/ZotLLM/issues)).
 
 <p align="center"><img src="docs/screenshots/en/ask.png" alt="Ask: answer with numbered citations and the cited passage"></p>
 <p align="center"><sub>Answers with citations; a click shows the passage and its page. Demo library with fictitious sources.</sub></p>
@@ -242,17 +243,18 @@ only embedded for the new model.
 ## Literature review
 
 For requests like "Write the state of research on … in 4000 words", a simple search is not enough. The mode works in
-four steps:
+five steps:
 
-1. **Find texts:** the helper model suggests search queries (German/English, synonyms, technical terms) that you
+1. **Keywords:** the helper model suggests search queries (German/English, synonyms, technical terms) that you
    check, edit, extend or delete – like search strings in literature databases. Hits are counted per document; for
-   each query you see how many texts it found and how many *only* it found. You review the selection, optionally as a
+   each query you see how many texts it found and how many *only* it found.
+2. **Select literature:** the helper model proposes a selection with reasons; you review it yourself, optionally as a
    Zotero collection.
-2. **Evaluate one by one:** an evaluation sheet per text (question, theory, method, sample, country, findings,
+3. **Evaluate one by one:** an evaluation sheet per text (question, theory, method, sample, country, findings,
    limitations, key quotations with page numbers) – stored in the index and as a note on the Zotero item. Before you
    start, input, output and reasoning tokens and – with prices entered – the estimated costs are shown.
-3. **Synthesis:** an editable outline, then section-by-section writing with citations `[@KEY, p. x]`.
-4. **Check:** every citation is checked against the selected texts, verbatim quotations against the original text;
+4. **Synthesis:** an editable outline, then section-by-section writing with citations `[@KEY, p. x]`.
+5. **Check:** every citation is checked against the selected texts, verbatim quotations against the original text;
    truncated sections are detected and can be rewritten. Output as Markdown, Word, LaTeX or a note in Zotero, with an
    appendix documenting the search (corpora, queries, hits).
 

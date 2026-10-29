@@ -461,6 +461,12 @@ class Store:
         row = self.con.execute("SELECT * FROM items WHERE lib=? AND key=?", (lib, key)).fetchone()
         return _item_row(row) if row else None
 
+    def items_of_type(self, item_type: str) -> list[dict]:
+        """Kurzangaben aller Einträge einer Zotero-Eintragsart (Personen entpackt), etwa für Beispiele im CSL-Editor."""
+        rows = self.con.execute("SELECT lib, key, creators, year, publication, doi, url, updated_at FROM items "
+                                "WHERE item_type=?", (item_type,)).fetchall()
+        return [{**dict(r), "creators": json.loads(r["creators"] or "[]")} for r in rows]
+
     def items(self, keys: Iterable[tuple[str, str]]) -> dict[tuple[str, str], dict]:
         out: dict[tuple[str, str], dict] = {}
         keys = list(keys)
